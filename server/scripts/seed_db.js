@@ -171,7 +171,7 @@ async function createAmbassador(opts) {
 }
 
 async function createSocialMatchNodes() {
-  let query =   ["MATCH (a:Tripler)",
+  let query =   ["MATCH (a:Ambassador)",
             "MATCH (b:Tripler)",
             "WHERE a <> b",
             "WITH  a, b, rand() as r",
@@ -180,7 +180,10 @@ async function createSocialMatchNodes() {
             "WITH  a, b",
             "WHERE a <> b",
             "MERGE (a)-[:HAS_SOCIAL_MATCH]->(s:SocialMatch)-[:HAS_SOCIAL_MATCH]->(b)",
-            "SET s.similarity_metric=rand()"].join("\n")
+            "SET s.similarity_metric=rand()",
+            "SET s.source_id=a.id",
+            "SET s.target_id=b.id",
+            ].join("\n")
   return neode.cypher(query,{})
 }
 

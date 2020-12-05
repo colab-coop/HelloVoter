@@ -1,18 +1,18 @@
-import stringFormat from "string-format";
+import stringFormat from "string-format"
 
-import neo4j from "neo4j-driver";
-import neode from "../lib/neode";
-import { serializeName } from "../lib/utils";
-import { normalizeGender, normalizePhone } from "../lib/normalizers";
-import mail from "../lib/mail";
-import { ov_config } from "../lib/ov_config";
-import sms from "../lib/sms";
+import neo4j from "neo4j-driver"
+import neode from "../lib/neode"
+import {serializeName} from "../lib/utils"
+import {normalizeGender, normalizePhone} from "../lib/normalizers"
+import mail from "../lib/mail"
+import {ov_config} from "../lib/ov_config"
+import sms from "../lib/sms"
 import {
   serializeTripler,
   serializeNeo4JTripler,
   serializeTriplee,
-} from "../routes/api/v1/va/serializers";
-import { confirmTriplerEmail } from '../emails/confirmTriplerEmail';
+} from "../routes/api/v1/va/serializers"
+import {confirmTriplerEmail} from "../emails/confirmTriplerEmail"
 
 /*
  *
@@ -22,7 +22,7 @@ import { confirmTriplerEmail } from '../emails/confirmTriplerEmail';
  *
  */
 async function findById(triplerId) {
-  return await neode.first("Tripler", "id", triplerId);
+  return await neode.first("Tripler", "id", triplerId)
 }
 
 /*
@@ -33,7 +33,7 @@ async function findById(triplerId) {
  *
  */
 async function findByPhone(phone) {
-  return await neode.first("Tripler", "phone", normalizePhone(phone));
+  return await neode.first("Tripler", "phone", normalizePhone(phone))
 }
 
 /*
@@ -49,20 +49,18 @@ async function findByPhone(phone) {
  *
  */
 async function findRecentlyConfirmedTriplers() {
-  let confirmed_triplers = await neode
-    .model("Tripler")
-    .all({ status: "confirmed" });
-  let recently_confirmed = [];
+  let confirmed_triplers = await neode.model("Tripler").all({status: "confirmed"})
+  let recently_confirmed = []
   for (var x = 0; x < confirmed_triplers.length; x++) {
-    let tripler = confirmed_triplers.get(x);
+    let tripler = confirmed_triplers.get(x)
     if (
       (tripler.get("confirmed_at") && !tripler.get("upgrade_sms_sent")) ||
       tripler.get("upgrade_sms_sent") === false
     ) {
-      recently_confirmed.push(tripler);
+      recently_confirmed.push(tripler)
     }
   }
-  return recently_confirmed;
+  return recently_confirmed
 }
 
 /*
@@ -86,51 +84,49 @@ async function findRecentlyConfirmedTriplers() {
  *
  */
 async function confirmTripler(triplerId) {
-  let tripler = await neode.first("Tripler", "id", triplerId);
-  let ambassador = tripler.get("claimed");
+  let tripler = await neode.first("Tripler", "id", triplerId)
+  let ambassador = tripler.get("claimed")
   if (tripler && tripler.get("status") === "pending") {
-    let confirmed_at = neo4j.default.types.LocalDateTime.fromStandardDate(
-      new Date()
-    );
-    await tripler.update({ status: "confirmed", confirmed_at: confirmed_at });
+    let confirmed_at = neo4j.default.types.LocalDateTime.fromStandardDate(new Date())
+    await tripler.update({status: "confirmed", confirmed_at: confirmed_at})
     let payout = await neode.create("Payout", {
       amount: ov_config.payout_per_tripler,
       status: "pending",
-    });
+    })
     await ambassador.relateTo(payout, "gets_paid", {
       tripler_id: tripler.get("id"),
-    });
+    })
 
     // If this ambassador was once a tripler, then reward the ambassador that
     // initially claimed the then-tripler, only once per upgraded ambassador
-    let allowBonus = ov_config.first_reward_payout > 0;
-    let was_once = ambassador.get("was_once");
+    let allowBonus = ov_config.first_reward_payout > 0
+    let was_once = ambassador.get("was_once")
     if (allowBonus && was_once && !was_once.get("rewarded_previous_claimer")) {
-      let was_tripler = was_once.otherNode();
+      let was_tripler = was_once.otherNode()
       if (was_tripler.get("status") === "confirmed") {
-        await was_once.update({ rewarded_previous_claimer: true });
+        await was_once.update({rewarded_previous_claimer: true})
 
         // TODO: Should this really be dependent on the payout? It doesn't seem to be used anywhere.
-        await was_tripler.update({ is_ambassador_and_has_confirmed: true });
+        await was_tripler.update({is_ambassador_and_has_confirmed: true})
 
-        was_tripler = await neode.first("Tripler", "id", was_tripler.get("id"));
+        was_tripler = await neode.first("Tripler", "id", was_tripler.get("id"))
         // This must be done because 'eager' only goes so deep
-        let claimer = was_tripler.get("claimed");
+        let claimer = was_tripler.get("claimed")
         let first_reward = await neode.create("Payout", {
           amount: ov_config.first_reward_payout,
           status: "pending",
-        });
+        })
         await claimer.relateTo(first_reward, "gets_paid", {
           tripler_id: was_tripler.get("id"),
-        });
+        })
       }
     }
   } else {
-    throw "Invalid status, cannot confirm";
+    throw "Invalid status, cannot confirm"
   }
 
   // send ambassador an sms
-  let triplees = JSON.parse(tripler.get("triplees"));
+  let triplees = JSON.parse(tripler.get("triplees"))
   try {
     await sms(
       ambassador.get("phone"),
@@ -142,39 +138,41 @@ async function confirmTripler(triplerId) {
         triplee_1: serializeTriplee(triplees[0]),
         triplee_2: serializeTriplee(triplees[1]),
         triplee_3: serializeTriplee(triplees[2]),
-      })
-    );
+      }),
+    )
   } catch (err) {
-    console.log("Could not send ambassador SMS on tripler confirmation: %s", err);
+    console.log("Could not send ambassador SMS on tripler confirmation: %s", err)
   }
 
   // send email in the background
   setTimeout(async () => {
-    let ambassador_name = serializeName(
-      ambassador.get("first_name"),
-      ambassador.get("last_name")
-    );
-    let relationships = ambassador.get("claims");
-    let date_claimed = null;
-    let relationship = null;
-    let confirmed_at = neo4j.default.types.LocalDateTime.fromStandardDate(
-      new Date()
-    );
+    let ambassador_name = serializeName(ambassador.get("first_name"), ambassador.get("last_name"))
+    let relationships = ambassador.get("claims")
+    let date_claimed = null
+    let relationship = null
+    let confirmed_at = neo4j.default.types.LocalDateTime.fromStandardDate(new Date())
     for (let x = 0; x < relationships.length; x++) {
-      let this_claim = relationships.get(x);
-      let claimed_tripler = this_claim.otherNode();
+      let this_claim = relationships.get(x)
+      let claimed_tripler = this_claim.otherNode()
       if (tripler.id === claimed_tripler.id) {
-        relationship = relationships.get(x);
-        date_claimed = relationship.get("since");
+        relationship = relationships.get(x)
+        date_claimed = relationship.get("since")
       }
     }
-    let address = JSON.parse(tripler.get("address"));
-    let body = confirmTriplerEmail(tripler, address, relationship, confirmed_at, ambassador_name, triplees);
+    let address = JSON.parse(tripler.get("address"))
+    let body = confirmTriplerEmail(
+      tripler,
+      address,
+      relationship,
+      confirmed_at,
+      ambassador_name,
+      triplees,
+    )
     let subject = stringFormat(ov_config.tripler_confirm_admin_email_subject, {
       organization_name: ov_config.organization_name,
-    });
-    await mail(ov_config.admin_emails, null, null, subject, body);
-  }, 100);
+    })
+    await mail(ov_config.admin_emails, null, null, subject, body)
+  }, 100)
 }
 
 /*
@@ -189,20 +187,23 @@ async function confirmTripler(triplerId) {
  *
  */
 async function detachTripler(triplerId) {
-  let tripler = await neode.first("Tripler", "id", triplerId);
+  let tripler = await neode.first("Tripler", "id", triplerId)
   if (tripler) {
-    let ambassador = tripler.get("claimed");
+    let ambassador = tripler.get("claimed")
     if (ambassador) {
-      await sms(tripler.get("phone"), ov_config.rejection_sms_for_tripler);
-      await sms(ambassador.get("phone"), stringFormat(ov_config.rejection_sms_for_ambassador, {
-        ambassador_first_name: ambassador.get("first_name"),
-        tripler_first_name: tripler.get("first_name"),
-        ambassador_landing_page: ov_config.ambassador_landing_page
-      }))
-      await tripler.delete();
+      await sms(tripler.get("phone"), ov_config.rejection_sms_for_tripler)
+      await sms(
+        ambassador.get("phone"),
+        stringFormat(ov_config.rejection_sms_for_ambassador, {
+          ambassador_first_name: ambassador.get("first_name"),
+          tripler_first_name: tripler.get("first_name"),
+          ambassador_landing_page: ov_config.ambassador_landing_page,
+        }),
+      )
+      await tripler.delete()
     }
   } else {
-    throw "Invalid tripler, cannot detach";
+    throw "Invalid tripler, cannot detach"
   }
 }
 
@@ -215,15 +216,15 @@ async function detachTripler(triplerId) {
  *
  */
 async function reconfirmTripler(triplerId) {
-  let tripler = await neode.first("Tripler", "id", triplerId);
+  let tripler = await neode.first("Tripler", "id", triplerId)
   if (tripler) {
     if (tripler.get("status") !== "pending") {
-      throw "Invalid status, cannot proceed";
+      throw "Invalid status, cannot proceed"
     }
 
-    let ambassador = tripler.get("claimed");
+    let ambassador = tripler.get("claimed")
 
-    let triplees = JSON.parse(tripler.get("triplees"));
+    let triplees = JSON.parse(tripler.get("triplees"))
     await sms(
       tripler.get("phone"),
       stringFormat(ov_config.tripler_reconfirmation_message, {
@@ -234,10 +235,10 @@ async function reconfirmTripler(triplerId) {
         triplee_1: serializeTriplee(triplees[0]),
         triplee_2: serializeTriplee(triplees[1]),
         triplee_3: serializeTriplee(triplees[2]),
-      })
-    );
+      }),
+    )
   } else {
-    throw "Invalid tripler";
+    throw "Invalid tripler"
   }
 }
 
@@ -248,7 +249,7 @@ async function reconfirmTripler(triplerId) {
  *
  */
 async function upgradeNotification(triplerId) {
-  let tripler = await neode.first("Tripler", "id", triplerId);
+  let tripler = await neode.first("Tripler", "id", triplerId)
   if (tripler) {
     await sms(
       tripler.get("phone"),
@@ -260,16 +261,16 @@ async function upgradeNotification(triplerId) {
         triplee_1: serializeTriplee(triplees[0]),
         triplee_2: serializeTriplee(triplees[1]),
         triplee_3: serializeTriplee(triplees[2]),
-      })
-    );
+      }),
+    )
   } else {
-    throw "Invalid tripler";
+    throw "Invalid tripler"
   }
 }
 
 /** Specifically for cypher matching. */
 function normalizeName(name) {
-  return (name || "").trim().replace(/-'/g, "").toLowerCase();
+  return (name || "").trim().replace(/-'/g, "").toLowerCase()
 }
 
 /**
@@ -278,14 +279,18 @@ function normalizeName(name) {
  */
 function calculateQueryPoints(query) {
   const points = {
-    firstName: 1, lastName: 1, phone: 2, distance: 0, age: 1, gender: 1, msa: 2,
+    firstName: 1,
+    lastName: 1,
+    phone: 2,
+    distance: 0,
+    age: 1,
+    gender: 1,
+    msa: 2,
   }
-  const queryPoints = [
-    'firstName', 'lastName', 'phone', 'distance', 'age', 'gender', 'msa',
-  ]
-    .map((key) => query[key] ? points[key] : 0)
-    .reduce((a, b) => a + b, 0);
-  return queryPoints;
+  const queryPoints = ["firstName", "lastName", "phone", "distance", "age", "gender", "msa"]
+    .map((key) => (query[key] ? points[key] : 0))
+    .reduce((a, b) => a + b, 0)
+  return queryPoints
 }
 
 /*
@@ -297,54 +302,55 @@ function calculateQueryPoints(query) {
  *
  */
 function buildTriplerSearchQuery(req) {
-  const { firstName, lastName, phone, distance, age, gender, msa } = req.query;
+  const {firstName, lastName, phone, distance, age, gender, msa} = req.query
 
   // Add an optional constraint for performance.
-  const { zip } = JSON.parse(req.user.get('address'));
+  const {zip} = JSON.parse(req.user.get("address"))
   // Guess whether this query will probably return too many results.
-  const isBroadQuery = calculateQueryPoints(req.query) < 2;
-  const zipFilter = isBroadQuery ? `and node.zip starts with left("${zip}", 3)` : '';
+  const isBroadQuery = calculateQueryPoints(req.query) < 2
+  const zipFilter = isBroadQuery ? `and node.zip starts with left("${zip}", 3)` : ""
 
-  const firstNameNorm = normalizeName(firstName);
-  const lastNameNorm = normalizeName(lastName);
-  let triplerQuery, nameType, nameToCompare;
+  const firstNameNorm = normalizeName(firstName)
+  const lastNameNorm = normalizeName(lastName)
+  let triplerQuery, nameType, nameToCompare
   if (firstNameNorm && lastNameNorm) {
-    triplerQuery = `CALL db.index.fulltext.queryNodes("triplerFullNameIndex", "*${firstNameNorm}* *${lastNameNorm}*") YIELD node`;
-    nameType = 'full';
-    nameToCompare = `first_n_q + ' ' + last_n_q`;
+    triplerQuery = `CALL db.index.fulltext.queryNodes("triplerFullNameIndex", "*${firstNameNorm}* *${lastNameNorm}*") YIELD node`
+    nameType = "full"
+    nameToCompare = `first_n_q + ' ' + last_n_q`
   } else if (firstNameNorm) {
-    triplerQuery = `CALL db.index.fulltext.queryNodes("triplerFirstNameIndex", "*${firstNameNorm}*") YIELD node`;
-    nameType = 'first';
-    nameToCompare = `first_n_q`;
+    triplerQuery = `CALL db.index.fulltext.queryNodes("triplerFirstNameIndex", "*${firstNameNorm}*") YIELD node`
+    nameType = "first"
+    nameToCompare = `first_n_q`
   } else if (lastNameNorm) {
-    triplerQuery = `CALL db.index.fulltext.queryNodes("triplerLastNameIndex", "*${lastNameNorm}*") YIELD node`;
-    nameType = 'last';
-    nameToCompare = `last_n_q`;
+    triplerQuery = `CALL db.index.fulltext.queryNodes("triplerLastNameIndex", "*${lastNameNorm}*") YIELD node`
+    nameType = "last"
+    nameToCompare = `last_n_q`
   } else {
-    triplerQuery = `match (node:Tripler)`;
+    triplerQuery = `match (node:Tripler)`
   }
-  const nodeName = `replace(replace(toLower(node.${nameType}_name), '-', ''), "'", '')`;
-  const stringDistScores = firstName || lastName ? `
+  const nodeName = `replace(replace(toLower(node.${nameType}_name), '-', ''), "'", '')`
+  const stringDistScores =
+    firstName || lastName
+      ? `
     apoc.text.levenshteinSimilarity(${nodeName}, ${nameToCompare}) as score1,
     apoc.text.jaroWinklerDistance(${nodeName}, ${nameToCompare}) as score2,
     apoc.text.sorensenDiceSimilarity(${nodeName}, ${nameToCompare}) as score3
-  ` : `
+  `
+      : `
     0 as score1, 0 as score2, 0 as score3
-  `;
+  `
 
-  const phoneFilter = phone ? `and node.phone in ["${normalizePhone(phone)}"]` : '';
-  const genderFilter = gender ? `and node.gender in ["${normalizeGender(gender)}"]` : '';
-  const ageFilter = age ? `and node.age_decade in ["${age}"]` : '';
-  const msaFilter = msa ? `and node.msa in ["${msa}"]` : '';
+  const phoneFilter = phone ? `and node.phone in ["${normalizePhone(phone)}"]` : ""
+  const genderFilter = gender ? `and node.gender in ["${normalizeGender(gender)}"]` : ""
+  const ageFilter = age ? `and node.age_decade in ["${age}"]` : ""
+  const msaFilter = msa ? `and node.msa in ["${msa}"]` : ""
 
   // 0 means "Doesn't matter".
-  const distanceValue = distance == null ? 0 : parseFloat(distance);
+  const distanceValue = distance == null ? 0 : parseFloat(distance)
 
   // TODO: Use parameter isolation for security.
   return `
-    match (a:Ambassador {id: "${req.user.get('id')}"})
-    optional match (a)-[:WAS_ONCE]->(ambassadorsTripler:Tripler)
-    with ambassadorsTripler,a.location as a_location,a
+    match (a:Ambassador {id: "${req.user.get("id")}"})
     ${triplerQuery}
     where
       not (:Ambassador)-[:CLAIMS]->(node)
@@ -353,22 +359,22 @@ function buildTriplerSearchQuery(req) {
       ${genderFilter}
       ${ageFilter}
       ${msaFilter}
-    with ambassadorsTripler,a_location, node,a
-    // find potential triplers that I have a social match with
-    optional match (a)-[:HAS_SOCIAL_MATCH]-(s:SocialMatch)-[:HAS_SOCIAL_MATCH]-(node)
-    // prioritize closing trianges
-    // increase score if potential tripler also knows another ambassador
-    optional match (node)-[:HAS_SOCIAL_MATCH]-(s2:SocialMatch)-[:HAS_SOCIAL_MATCH]-(otherAmbassadorTripler:Tripler)<-[]-(:Ambassador)
-    with s,s2, a_location, node, ${firstNameNorm ? `"${firstNameNorm}"` : null} as first_n_q, ${lastNameNorm ? `"${lastNameNorm}"` : null} as last_n_q
-    with a_location, node, first_n_q, last_n_q,
-      ${stringDistScores},
-    CASE s.similarity_metric WHEN null THEN 0 ELSE s.similarity_metric*(1+count(s2)) END AS similarity
+    with a.location as a_location, node,a, distance(a.location, node.location) as distance_filter
+    order by distance_filter asc
+    limit 500
+    // optional match (s:SocialMatch {source_id: "${req.user.get("id")}"})-[:HAS_SOCIAL_MATCH]-(node)
+    with a, a_location, node, ${firstNameNorm ? `"${firstNameNorm}"` : null} as first_n_q, ${
+    lastNameNorm ? `"${lastNameNorm}"` : null
+  } as last_n_q
+    with a, a_location, node, first_n_q, last_n_q,
+      ${stringDistScores}
     with
-      node, similarity + avg(score1 + score2 + score3) + (10000 /  distance(a_location, node.location)) * ${distanceValue} as final_score, distance(a_location, node.location) as distance
-    return node, final_score
-    order by final_score desc,distance asc, node.last_name asc, node.first_name asc
+      a, node,  avg(score1 + score2 + score3) + (10000 /  distance(a_location, node.location)) * ${distanceValue} as final_score, distance(a_location, node.location) as distance
+    optional match (s:SocialMatch {source_id: "${req.user.get("id")}"})-[:HAS_SOCIAL_MATCH]-(node)
+    RETURN node, case when s.similarity_metric is null then 0 else s.similarity_metric end as similarity_metric
+    order by similarity_metric desc, final_score desc
     limit 100
-  `;
+  `
 }
 
 /*
@@ -379,15 +385,15 @@ function buildTriplerSearchQuery(req) {
  *
  */
 async function searchTriplersAmbassador(req) {
-  const query = buildTriplerSearchQuery(req);
-  let collection = await neode.cypher(query);
-  let models = [];
+  const query = buildTriplerSearchQuery(req)
+  let collection = await neode.cypher(query)
+  let models = []
   for (let index = 0; index < collection.records.length; index++) {
-    let entry = collection.records[index]._fields[0].properties;
-    models.push(serializeNeo4JTripler(entry));
+    let entry = collection.records[index]._fields[0].properties
+    models.push(serializeNeo4JTripler(entry))
   }
 
-  return models;
+  return models
 }
 
 /*
@@ -402,8 +408,10 @@ async function searchTriplersAmbassador(req) {
  */
 async function updateTriplerBlockedCarrier(tripler, carrier) {
   await tripler.update({
-    blocked_carrier_info: tripler.get('blocked_carrier_info') ? tripler.get('blocked_carrier_info') + JSON.stringify(carrier, null, 2) : JSON.stringify(carrier, null, 2)
-  });
+    blocked_carrier_info: tripler.get("blocked_carrier_info")
+      ? tripler.get("blocked_carrier_info") + JSON.stringify(carrier, null, 2)
+      : JSON.stringify(carrier, null, 2),
+  })
 }
 
 /*
@@ -418,8 +426,10 @@ async function updateTriplerBlockedCarrier(tripler, carrier) {
  */
 async function updateTriplerCarrier(tripler, carrier) {
   await tripler.update({
-    carrier_info: tripler.get('carrier_info') ? tripler.get('carrier_info') + JSON.stringify(carrier, null, 2) : JSON.stringify(carrier, null, 2)
-  });
+    carrier_info: tripler.get("carrier_info")
+      ? tripler.get("carrier_info") + JSON.stringify(carrier, null, 2)
+      : JSON.stringify(carrier, null, 2),
+  })
 }
 
 /*
@@ -431,8 +441,8 @@ async function updateTriplerCarrier(tripler, carrier) {
  */
 async function updateClaimedBirthMonth(tripler, month) {
   await tripler.update({
-    claimed_birth_month: month
-  });
+    claimed_birth_month: month,
+  })
 }
 
 /*
@@ -449,14 +459,7 @@ async function updateClaimedBirthMonth(tripler, month) {
  *   phone number before calling this function.
  *
  */
-async function startTriplerConfirmation(
-  ambassador,
-  tripler,
-  triplerPhone,
-  triplees,
-  verification
-) {
-
+async function startTriplerConfirmation(ambassador, tripler, triplerPhone, triplees, verification) {
   try {
     await sms(
       triplerPhone,
@@ -469,18 +472,20 @@ async function startTriplerConfirmation(
         triplee_1: serializeTriplee(triplees[0]),
         triplee_2: serializeTriplee(triplees[1]),
         triplee_3: serializeTriplee(triplees[2]),
-      })
-    );
+      }),
+    )
   } catch (err) {
-    throw "Error sending confirmation sms to the tripler";
+    throw "Error sending confirmation sms to the tripler"
   }
 
   await tripler.update({
     triplees: JSON.stringify(triplees, null, 2),
     status: "pending",
     phone: triplerPhone,
-    verification: tripler.get('verification') ? tripler.get('verification') + JSON.stringify(verification, null, 2) : JSON.stringify(verification, null, 2)
-  });
+    verification: tripler.get("verification")
+      ? tripler.get("verification") + JSON.stringify(verification, null, 2)
+      : JSON.stringify(verification, null, 2),
+  })
 }
 
 module.exports = {
@@ -495,5 +500,5 @@ module.exports = {
   startTriplerConfirmation: startTriplerConfirmation,
   updateTriplerCarrier: updateTriplerCarrier,
   updateTriplerBlockedCarrier: updateTriplerBlockedCarrier,
-  updateClaimedBirthMonth: updateClaimedBirthMonth
-};
+  updateClaimedBirthMonth: updateClaimedBirthMonth,
+}

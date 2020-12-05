@@ -54,23 +54,28 @@ module.exports = {
     },
     eager: true,
   },
-  signup_completed: {  // Has this voter completed the signup form?
+  signup_completed: {
+    // Has this voter completed the signup form?
     type: "boolean",
     default: false,
   },
-  approved: {  // Has this voter passed Alloy checks?
+  approved: {
+    // Has this voter passed Alloy checks?
     type: "boolean",
     default: false,
   },
-  quiz_completed: {  // Has this voter completed the WordPress quiz?
+  quiz_completed: {
+    // Has this voter completed the WordPress quiz?
     type: "boolean",
     default: false,
   },
-  onboarding_completed: {  // Has this voter completed all onboarding steps?
+  onboarding_completed: {
+    // Has this voter completed all onboarding steps?
     type: "boolean",
     default: false,
   },
-  giftcard_completed: {  // Have we sent this voter a gift card for finishing onboarding?
+  giftcard_completed: {
+    // Have we sent this voter a gift card for finishing onboarding?
     type: "boolean",
     default: false,
   },
@@ -78,11 +83,13 @@ module.exports = {
     type: "localdatetime",
     default: () => new Date(),
   },
-  locked: {  // Has this voter been flagged for fraud?
+  locked: {
+    // Has this voter been flagged for fraud?
     type: "boolean",
     default: false,
   },
-  admin: {  // Does this voter have admin privileges?
+  admin: {
+    // Does this voter have admin privileges?
     type: "boolean",
     default: false,
   },
@@ -90,11 +97,13 @@ module.exports = {
     type: "boolean",
     default: false,
   },
-  paypal_approved: {  // Is this voter allowed to set up payouts via PayPal?
+  paypal_approved: {
+    // Is this voter allowed to set up payouts via PayPal?
     type: "boolean",
     default: false,
   },
-  payout_provider: {  // "stripe" or "paypal"
+  payout_provider: {
+    // "stripe" or "paypal"
     type: "string",
   },
   // This relationship connects an Ambassador to a Payout. An Ambassador can have many

@@ -104,7 +104,7 @@ async function signup(json, verification, carrierLookup) {
     address: JSON.stringify(address, null, 2),
     quiz_results: JSON.stringify(json.quiz_results, null, 2) || null,
     signup_completed: true,
-    approved:false,
+    approved: false,
     location: {
       latitude: parseFloat(coordinates.latitude),
       longitude: parseFloat(coordinates.longitude),
