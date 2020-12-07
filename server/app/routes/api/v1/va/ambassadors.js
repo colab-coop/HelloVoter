@@ -99,24 +99,7 @@ async function countAmbassadors(req, res) {
  *
  */
 async function fetchAmbassadors(req, res) {
-  let query = {}
-
-  if (req.query.phone) query.phone = normalizePhone(req.query.phone)
-  if (req.query.email) query.email = req.query.email
-  if (req.query["external-id"]) query.external_id = req.query["external-id"]
-  if (req.query.approved) query.approved = req.query.approved.toLowerCase() === "true"
-  if (req.query.locked) query.locked = req.query.locked.toLowerCase() === "true"
-  if (req.query["signup-completed"])
-    query.signup_completed = req.query["signup-completed"] === "true"
-  if (req.query["onboarding-completed"])
-    query.onboarding_completed = req.query["onboarding-completed"] === "true"
-
-  const collection = await req.neode.model("Ambassador").all(query)
-  let models = []
-  for (var index = 0; index < collection.length; index++) {
-    let entry = collection.get(index)
-    models.push(serializeAmbassador(entry))
-  }
+  let models = await ambassadorsSvc.searchAmbassadors(req)
   return res.json(models)
 }
 
@@ -153,10 +136,7 @@ async function fetchCurrentAmbassador(req, res) {
  *
  * approveAmbassdaor(req, res)
  *
- * This function sets an Ambassador to be approved:true and locked:false.
- *
- * This used to happen in the context of the admin panel, but now this function is obsolete
- *   because Ambassadors are auto-approved.
+ * This function sets an Ambassador to be approved:true, locked:false, and onboarding_completed:true
  *
  * When this function is called, an approval SMS is sent to the Ambassador.
  *
@@ -168,11 +148,7 @@ async function approveAmbassador(req, res) {
     return error(404, res, "Ambassador not found")
   }
 
-  if (!found.get("onboarding_completed")) {
-    return error(400, res, "Onboarding not completed for the user yet")
-  }
-
-  let json = {...{approved: true, locked: false}}
+  let json = {...{approved: true, locked: false, onboarding_completed: true}}
   let updated = await found.update(json)
 
   try {

@@ -11,6 +11,7 @@ import {getValidCoordinates, normalizePhone} from "../lib/normalizers"
 import mail from "../lib/mail"
 import {ov_config} from "../lib/ov_config"
 import {signupEmail} from "../emails/signupEmail"
+import {serializeAmbassadorForAdmin} from "../routes/api/v1/va/serializers"
 
 /*
  *
@@ -217,10 +218,48 @@ async function unclaimTriplers(req) {
   }
 }
 
+/*
+ *
+ * buildAmbassadorSearchQuery(req)
+ *
+ * The utility function for the search functions to build the cypher query
+ *
+ *
+ */
+function buildAmbassadorSearchQuery(req) {
+  return `
+    match (a:Ambassador)
+    where
+      a.external_id is not null
+    return a
+    order by a.last_name asc
+    limit 500`
+}
+
+/*
+ *
+ * searchAmbassadors(req)
+ *
+ * The function for an Ambassador searching for Triplers.
+ *
+ */
+async function searchAmbassadors(req) {
+  const query = buildAmbassadorSearchQuery(req)
+  let collection = await neode.cypher(query)
+  let models = []
+  for (let index = 0; index < collection.records.length; index++) {
+    let entry = collection.records[index]._fields[0].properties
+    models.push(entry)
+  }
+
+  return models
+}
+
 module.exports = {
   findByExternalId: findByExternalId,
   findById: findById,
   signup: signup,
   getPrimaryAccount: getPrimaryAccount,
   unclaimTriplers: unclaimTriplers,
+  searchAmbassadors: searchAmbassadors,
 }
