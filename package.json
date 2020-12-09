@@ -25,6 +25,7 @@
   "devDependencies": {
     "concurrently": "^5.1.0",
     "prettier": "^2.2.0",
-    "pretty-quick": "^3.1.0"
+    "pretty-quick": "^3.1.0",
+    "run-func": "^1.0.5"
   }
 }

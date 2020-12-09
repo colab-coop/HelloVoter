@@ -136,8 +136,7 @@ async function fetchCurrentAmbassador(req, res) {
  *
  * approveAmbassdaor(req, res)
  *
- * This function sets an Ambassador to be approved:true, locked:false, and onboarding_completed:true
- *
+ * This function sets an Ambassador to be approved:true, locked:false
  * When this function is called, an approval SMS is sent to the Ambassador.
  *
  */
@@ -148,7 +147,7 @@ async function approveAmbassador(req, res) {
     return error(404, res, "Ambassador not found")
   }
 
-  let json = {...{approved: true, locked: false, onboarding_completed: true}}
+  let json = {...{approved: true, locked: false}}
   let updated = await found.update(json)
 
   try {
@@ -369,7 +368,7 @@ async function updateAmbassador(req, res) {
  * updateCurrentAmbassador(req, res)
  *
  * This function was intended to provide Ambassadors with a method of altering their profile information.
- *   However, this functionality is not in place on the frontend. It is currently commented out.
+ * This updated information is sent to HubSpot.
  *
  */
 async function updateCurrentAmbassador(req, res) {
@@ -400,6 +399,14 @@ async function updateCurrentAmbassador(req, res) {
     return error(400, res, err.message)
   }
   let updated = await found.update(json)
+
+  //if ambassador doesn't currently have a hubspotID, this will set it
+  if (!req.user.get("hs_id")) {
+    await ambassadorsSvc.initialSyncAmbassadorToHubSpot(updated)
+  }
+
+  await ambassadorsSvc.syncAmbassadorToHubSpot(updated)
+
   return res.json(serializeAmbassador(updated))
 }
 
@@ -425,6 +432,7 @@ async function deleteAmbassador(req, res) {
  * This cypher query finds how many Triplers this Ambassador already has claimed, limits the claim list to just
  *   the Triplers that can be claimed and still remain under the CLAIM_TRIPLER_LIMIT env var, then claims them.
  *
+ * If the Ambassador has a Hubspot ID (hs_id), the Ambassador's tripler numbers are updated in HubSpot.
  */
 async function claimTriplers(req, res) {
   let ambassador = req.user
@@ -454,6 +462,7 @@ async function claimTriplers(req, res) {
   `
 
   let collection = await req.neode.cypher(query)
+  await ambassadorsSvc.sendTriplerCountsToHubspot(req.user)
 
   return _204(res)
 }

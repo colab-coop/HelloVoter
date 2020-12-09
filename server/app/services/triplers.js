@@ -13,6 +13,8 @@ import {
   serializeTriplee,
 } from "../routes/api/v1/va/serializers"
 import {confirmTriplerEmail} from "../emails/confirmTriplerEmail"
+import ambassadorsSvc from "./ambassadors"
+
 
 /*
  *
@@ -81,11 +83,17 @@ async function findRecentlyConfirmedTriplers() {
  *
  * An SMS is sent to the Ambassador that claims this Tripler, and an admin email is sent,
  *   depending on .env var configuration.
+ * 
+ * If the Ambassador that claims the tripler has a Hubspot ID, the Tripler counts (pending, confirmed, unconfirmed)
+ * will be updated once this function is triggered. If the Ambassador does not have a Hubspot ID, the sendTriplerCountsToHubspot
+ * should do nothing. 
  *
  */
 async function confirmTripler(triplerId) {
   let tripler = await neode.first("Tripler", "id", triplerId)
   let ambassador = tripler.get("claimed")
+  await ambassadorsSvc.sendTriplerCountsToHubspot(ambassador)
+
   if (tripler && tripler.get("status") === "pending") {
     let confirmed_at = neo4j.default.types.LocalDateTime.fromStandardDate(new Date())
     await tripler.update({status: "confirmed", confirmed_at: confirmed_at})
@@ -185,11 +193,14 @@ async function confirmTripler(triplerId) {
  *   the Tripler a "rejection" SMS.
  * The function then removes the Tripler's neo4j node.
  *
+ * Also updates the Ambassador's tripler counts in hubspot.
  */
 async function detachTripler(triplerId) {
   let tripler = await neode.first("Tripler", "id", triplerId)
   if (tripler) {
     let ambassador = tripler.get("claimed")
+    await ambassadorsSvc.sendTriplerCountsToHubspot(ambassador)
+
     if (ambassador) {
       await sms(tripler.get("phone"), ov_config.rejection_sms_for_tripler)
       await sms(
@@ -353,7 +364,7 @@ function buildTriplerSearchQuery(req) {
     match (a:Ambassador {id: "${req.user.get("id")}"})
     ${triplerQuery}
     where
-      node.status = "unconfirmed"
+      not (node)<-[:CLAIMS]-(:Ambassador)
       and not (:Ambassador)-[:WAS_ONCE]->(node)
       ${phoneFilter}
       ${genderFilter}
@@ -451,7 +462,7 @@ async function updateClaimedBirthMonth(tripler, month) {
  * This function sends the Tripler an SMS asking them to confirm to vote and get their
  *   3 triplees to vote as well.
  *
- * The function updates the Tripler to "pending" status
+ * The function updates the Tripler to "pending" status, and sends this new status to HubSpot
  *
  * Note the Ambassador that has claimed this Tripler can and often does update the Tripler's
  *   phone number at this time. The /routes side of this will do verification on the Tripler's
@@ -485,6 +496,7 @@ async function startTriplerConfirmation(ambassador, tripler, triplerPhone, tripl
       ? tripler.get("verification") + JSON.stringify(verification, null, 2)
       : JSON.stringify(verification, null, 2),
   })
+  await ambassadorsSvc.sendTriplerCountsToHubspot(ambassador)
 }
 
 module.exports = {

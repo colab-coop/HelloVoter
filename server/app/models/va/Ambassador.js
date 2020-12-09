@@ -12,6 +12,9 @@ module.exports = {
   external_id: {
     type: "string",
   },
+  hs_id: {
+    type: "integer",
+  },
   first_name: {
     type: "string",
     required: true,

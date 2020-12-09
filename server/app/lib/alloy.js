@@ -37,3 +37,36 @@ export async function verifyAlloy(first_name, last_name, address, city, state, z
     return null
   }
 }
+
+/*
+ *
+ * fuzzyAlloy()
+ *
+ * A fuzzy search of Alloy
+ *
+ */
+export async function fuzzyAlloy(first_name, last_name, state, zip) {
+  let alloyKey = ov_config.alloy_key
+  let alloySecret = ov_config.alloy_secret
+
+  console.log(`[ALLOY] Calling Fuzzy API with: ${first_name} ${last_name} ${state} ${zip}`)
+
+  try {
+    let response
+    if (alloyKey && alloySecret) {
+      response = await axios.get(
+        `https://api.alloy.us/v1/search?first_name=${first_name}&last_name=${last_name}&state=${state}&zip=${zip}`,
+        {
+          auth: {
+            username: alloyKey,
+            password: alloySecret,
+          },
+        },
+      )
+    }
+    return response.data.total
+  } catch (err) {
+    console.log(`[ALLOY] Fuzzy Search failed with error ${err}`)
+    return null
+  }
+}
