@@ -181,15 +181,14 @@ async function initialSyncAmbassadorToHubSpot(ambassador) {
   //only continue if there's no hs_id
 
   let obj = {}
-  ;[
-    "first_name",
-    "last_name",
-    "approved",
-    "email",
-    "phone",
-    "external_id",
-  ].forEach((x) => (obj[x] = ambassador.get(x)))
-  obj["alloy_person_id"] = ambassador.get("alloy_person_id") ? ambassador.get("alloy_person_id").toString() : null
+  ;["first_name", "last_name", "approved", "email", "phone", "external_id"].forEach(
+    (x) => (obj[x] = ambassador.get(x)),
+  )
+  obj["alloy_person_id"] = ambassador.get("alloy_person_id")
+    ? ambassador.get("alloy_person_id").toString()
+    : null
+  obj["website"] =
+    "https://app.blockpower.vote/ambassadors/admin/#/volunteers/view/" + ambassador.get("id")
   if (!ambassador.get("hs_id")) {
     console.log("no hs id, gettig it from hs")
     const hs_response = await getAmbassadorHSID(ambassador.get("email"))
@@ -220,7 +219,7 @@ async function initialSyncAmbassadorToHubSpot(ambassador) {
  */
 
 async function syncAmbassadorToHubSpot(ambassador) {
-  //only continue if there's no hs_id
+  //only continue if there IS hs_id
   if (ambassador.get("hs_id")) {
     let obj = {}
     ;[
@@ -239,8 +238,12 @@ async function syncAmbassadorToHubSpot(ambassador) {
       "is_admin",
       "payout_provider",
     ].forEach((x) => (obj[x] = ambassador.get(x)))
+    obj["website"] =
+      "https://app.blockpower.vote/ambassadors/admin/#/volunteers/view/" + ambassador.get("id")
     obj["hs_id"] = ambassador.get("hs_id").toString()
-    obj["alloy_person_id"] = ambassador.get("alloy_person_id") ? ambassador.get("alloy_person_id").toString() : null
+    obj["alloy_person_id"] = ambassador.get("alloy_person_id")
+      ? ambassador.get("alloy_person_id").toString()
+      : null
     updateHubspotAmbassador(obj)
   }
   return ambassador.get("hs_id")

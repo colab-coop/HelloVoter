@@ -92,7 +92,6 @@ async function findRecentlyConfirmedTriplers() {
 async function confirmTripler(triplerId) {
   let tripler = await neode.first("Tripler", "id", triplerId)
   let ambassador = tripler.get("claimed")
-  await ambassadorsSvc.sendTriplerCountsToHubspot(ambassador)
 
   if (tripler && tripler.get("status") === "pending") {
     let confirmed_at = neo4j.default.types.LocalDateTime.fromStandardDate(new Date())
@@ -181,6 +180,8 @@ async function confirmTripler(triplerId) {
     })
     await mail(ov_config.admin_emails, null, null, subject, body)
   }, 100)
+
+  await ambassadorsSvc.sendTriplerCountsToHubspot(ambassador)
 }
 
 /*

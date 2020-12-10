@@ -64,7 +64,8 @@ async function updateHubspotAmbassador(req) {
             paypal_approved: req.paypal_approved ? req.paypal_approved : null,
             locked: req.locked ? req.locked : null,
             has_w9: req.has_w9 ? req.has_w9 : null,
-            payout_provider: req.payout_provider ? req.payout_provider : null
+            payout_provider: req.payout_provider ? req.payout_provider : null,
+            website: req.website ? req.website : null,
           },
         },
       )
@@ -79,7 +80,7 @@ async function updateHubspotAmbassador(req) {
 async function createHubspotContact(req) {
   let hs_key = ov_config.hubspot_api_key
   console.log("req", req)
-  console.log(`[HS] Creating Hubspot Contact For Ambassador`)
+  console.log(`[HS] Creating Hubspot Contact`)
   try {
     let response
     if (hs_key) {
@@ -107,7 +108,8 @@ async function createHubspotContact(req) {
             paypal_approved: req.paypal_approved ? req.paypal_approved : null,
             locked: req.locked ? req.locked : null,
             has_w9: req.has_w9 ? req.has_w9 : null,
-            payout_provider: req.payout_provider ? req.payout_provider : null
+            payout_provider: req.payout_provider ? req.payout_provider : null,
+            website: req.website ? req.website : null,
           },
         },
       )
