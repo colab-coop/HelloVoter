@@ -63,19 +63,37 @@ function serializeAmbassador(ambassador) {
   obj["account"] = !!account ? serializeAccount(account.otherNode()) : null
   obj["hs_id"] = ambassador.get("hs_id") ? ambassador.get("hs_id").toString() : ""
 
-  let claimees = ambassador.get("claims")
-  let array = []
-  for (let index = 0; index < claimees.length; index++) {
-    array.push(serializeTripler(claimees.get(index).otherNode()))
-  }
-
-  obj["claimees"] = array
   return obj
 }
 
 function serializeAmbassadorForAdmin(ambassador) {
   let obj = serializeAmbassador(ambassador)
-  obj.verification = ambassador.get("verification")
+
+  // add the values only admin will see here
+  obj["verification"] = ambassador.get("verification")
+  obj["quiz_completed"] = ambassador.get("quiz_completed")
+  obj["onboarding_completed"] = ambassador.get("onboarding_completed")
+  obj["giftcard_completed"] = ambassador.get("giftcard_completed")
+  obj["signup_completed"] = ambassador.get("signup_completed")
+  obj["locked"] = ambassador.get("locked")
+  obj["payout_provider"] = ambassador.get("payout_provider")
+
+  //claimees
+  let claimees = ambassador.get("claims")
+  let claimees_array = []
+  for (let index = 0; index < claimees.length; index++) {
+    claimees_array.push(serializeTripler(claimees.get(index).otherNode()))
+  }
+  obj["claimees"] = claimees_array
+
+  //payouts
+  let payouts = ambassador.get("gets_paid")
+  let payouts_array = []
+  for (let index = 0; index < payouts.length; index++) {
+    payouts_array.push(serializePayout(payouts.get(index).otherNode()))
+  }
+  obj["payouts"] = payouts_array
+
   return obj
 }
 

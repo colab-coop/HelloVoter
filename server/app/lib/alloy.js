@@ -55,7 +55,7 @@ export async function fuzzyAlloy(first_name, last_name, state, zip) {
     let response
     if (alloyKey && alloySecret) {
       response = await axios.get(
-        `https://api.alloy.us/v1/search?first_name=${first_name}&last_name=${last_name}&state=${state}&zip=${zip}`,
+        `https://api.alloy.us/v1/search?first_name=${first_name}&last_name=${last_name}&state=GA&zip=${zip}`,
         {
           auth: {
             username: alloyKey,

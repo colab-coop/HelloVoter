@@ -146,8 +146,8 @@ async function approveAmbassador(req, res) {
   if (!found) {
     return error(404, res, "Ambassador not found")
   }
-
-  let json = {...{approved: true, locked: false}}
+  // per discussion - pressing "approve" in admin ONLY changes approve
+  let json = {...{approved: true}}
   let updated = await found.update(json)
 
   try {
@@ -226,8 +226,8 @@ async function disapproveAmbassador(req, res) {
   if (!found) {
     return error(404, res, "Ambassador not found")
   }
-
-  let json = {...{approved: false, locked: true}}
+  //disapprove ONLY dissaproves. Before it would also lock. 
+  let json = {...{approved: false}}
   let updated = await found.update(json)
   return _204(res)
 }
