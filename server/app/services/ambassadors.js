@@ -8,6 +8,7 @@ import neode from "../lib/neode"
 import {validateEmpty, validateUnique, assertUserPhoneAndEmail} from "../lib/validations"
 
 import {ValidationError} from "../lib/errors"
+import {isLocked} from "../lib/fraud"
 import {trimFields} from "../lib/utils"
 import {getValidCoordinates, normalizePhone} from "../lib/normalizers"
 import mail from "../lib/mail"
@@ -167,6 +168,10 @@ async function signup(json, verification, carrierLookup) {
 
   initialSyncAmbassadorToHubSpot(new_ambassador)
 
+  if (typeof verification[1] !== "undefined") {
+    setAmbassadorEkataAssociatedPeople(new_ambassador, verification)
+  }
+
   return new_ambassador
 }
 
@@ -191,14 +196,18 @@ async function initialSyncAmbassadorToHubSpot(ambassador) {
     "https://app.blockpower.vote/ambassadors/admin/#/volunteers/view/" + ambassador.get("id")
   if (!ambassador.get("hs_id")) {
     console.log("no hs id, gettig it from hs")
-    const hs_response = await getAmbassadorHSID(ambassador.get("email"))
+    let hs_response = await getAmbassadorHSID(ambassador.get("email"))
     if (!hs_response) {
       createHubspotContact(obj)
-      const hs_response = await getAmbassadorHSID(ambassador.get("email"))
+      hs_response = await getAmbassadorHSID(ambassador.get("email"))
+    }
+
+    if (!hs_response) {
+      return null
     }
 
     let cypher_response = await neode.cypher(
-      "MATCH (a:Ambassador {id: $id}) SET a.hs_id=toInteger($hs_id) RETURN a.first_name, a.hs_id",
+      "MATCH (a:Ambassador {id: $id}) SET a.hs_id=$hs_id RETURN a.first_name, a.hs_id",
       {
         id: ambassador.get("id"),
         hs_id: hs_response,
@@ -231,7 +240,6 @@ async function syncAmbassadorToHubSpot(ambassador) {
       "external_id",
       "phone",
       "signup_completed",
-      "locked",
       "has_w9",
       "paypal_approved",
       "giftcard_completed",
@@ -244,6 +252,7 @@ async function syncAmbassadorToHubSpot(ambassador) {
     obj["alloy_person_id"] = ambassador.get("alloy_person_id")
       ? ambassador.get("alloy_person_id").toString()
       : null
+    obj["locked"] = isLocked(ambassador)
     updateHubspotAmbassador(obj)
   }
   return ambassador.get("hs_id")
@@ -291,40 +300,86 @@ async function sendTriplerCountsToHubspot(ambassador) {
 }
 
 /*
- *
- * getPrimaryAccount(ambassador)
- *
- * This function returns the primary Account node for a given Ambassador
- *
- * NOTE: there was originally no is_primary attribute on Ambassador nodes.
- *   The update that added this attribute did not do so via a migration.
- *   Therefore in the database, there existed (exists) legacy nodes without
- *   this attribute. This function checks if none of the Account nodes are
- *   is_primary:true and if none exist, it sets the first one to be primary.
- *
+ * updateEkataMatchScore(ambassador)
+ * Based on the ambassador's verification string and that of the the triplers connected to it,
+ * update the ambassador's Ekata Match Penalty.
  */
-async function getPrimaryAccount(ambassador) {
-  let relationships = ambassador.get("owns_account")
-  let primaryAccount = null
 
-  if (relationships.length > 0) {
-    relationships.forEach((ownsAccount) => {
-      if (ownsAccount.otherNode().get("is_primary")) {
-        primaryAccount = ownsAccount.otherNode()
+async function updateEkataMatchScore(ambassador) {
+  //resetting (in case any validation score changed, it calculates fresh)
+  let ambassadorMatches = 0
+  let tripler_ekata_blemish = 0
+  let ambassador_ekata_blemish = 0
+  let re = /\d* \w{1,2}/
+
+  //these are still being tuned to find the best fit
+
+  let ambassadorEkataThreshold = ov_config.ambassadorEkataThreshold || 1
+  let ambassadorEkataPenalty = ov_config.ambassadorEkataPenalty || 2
+  let triplerEkataPenalty = ov_config.triplerEkataPenalty || 1
+  let triplerEkataBonus = ov_config.triplerEkataBonus || 2
+
+  let query =
+    "MATCH (a:Ambassador {id:$a_id})-[:CLAIMS]->(t:Tripler) WHERE  t.status <> 'unconfirmed' RETURN t.first_name as first_name, t.last_name as last_name, t.address as address, t.verification as verification"
+  let collection = await neode.cypher(query, {a_id: ambassador.get("id")})
+  for (let index = 0; index < collection.records.length; index++) {
+    let invidualTriplerMatchScore = 0
+    let triplerAddress = collection.records[index].get("address").toLowerCase()
+    let verificationString = collection.records[index].get("verification").toString().toLowerCase()
+    let triplerProperties = []
+    triplerProperties.push(collection.records[index].get("first_name").toLowerCase())
+    triplerProperties.push(collection.records[index].get("last_name").toLowerCase())
+    triplerProperties.push(triplerAddress.match(re)[0].toLowerCase())
+    for (let i in triplerProperties) {
+      if (verificationString.includes(triplerProperties[i])) {
+        invidualTriplerMatchScore++
       }
-    })
+    }
 
-    if (!primaryAccount) {
-      // probably a legacy account
-      relationships.forEach(async (ownsAccount) => {
-        if (primaryAccount) return
-        await ownsAccount.otherNode().update({is_primary: true})
-        primaryAccount = ownsAccount.otherNode()
-      })
+    if (invidualTriplerMatchScore >= 1) {
+    // if the individual tripler has one or more matches (good), then the overall tripler blemish is made smaller
+      tripler_ekata_blemish = tripler_ekata_blemish - triplerEkataBonus
+    } else {
+    // if the individual tripler has less than one match (bad), then the overall tripler blemish is made larger
+      tripler_ekata_blemish = tripler_ekata_blemish + triplerEkataPenalty
     }
   }
 
-  return primaryAccount
+  // determining the blemishness of the ambassador
+
+  let verificationString = ambassador.get("verification").toLowerCase()
+  let ambassadorAddress = ambassador.get("address").toLowerCase()
+  let ambassadorProperties = [
+    ambassador.get("first_name").toLowerCase(),
+    ambassador.get("last_name").toLowerCase(),
+    ambassadorAddress.match(re)[0].toLowerCase() ? ambassadorAddress.match(re)[0].toLowerCase() : ""
+  ]
+  for (let i in ambassadorProperties) {
+    if (verificationString.includes(ambassadorProperties[i])) {
+      ambassadorMatches++
+    }
+  }
+
+  // if the ambassador does not have enough matches, levy the penalty
+
+  if (ambassadorMatches < ambassadorEkataThreshold) {
+    ambassador_ekata_blemish = ambassadorEkataPenalty
+  }
+
+  ambassador.update({
+    ambassador_ekata_blemish: ambassador_ekata_blemish,
+    tripler_ekata_blemish: Math.max(0,tripler_ekata_blemish), //tripler_ekata_blemish should not be negative, floor is 0
+  })
+}
+
+// Returns the primary Account node for a given Ambassador.
+async function getPrimaryAccount(ambassador) {
+  const edges = ambassador.get("owns_account") || []
+  for (let e = 0; e < edges.length; e++) {
+    const other = edges.get(e)?.otherNode()
+    if (other?.get("is_primary")) return other
+  }
+  return null
 }
 
 /*
@@ -351,6 +406,7 @@ async function unclaimTriplers(req) {
   }
 
   await sendTriplerCountsToHubspot(ambassador)
+  await updateEkataMatchScore(ambassador)
 }
 
 /*
@@ -390,6 +446,24 @@ async function searchAmbassadors(req) {
   return models
 }
 
+async function setAmbassadorEkataAssociatedPeople(ambassador, verification) {
+  if (typeof verification[1] !== "undefined") {
+    const people = verification[1]["name"]["result"]["associated_people"]
+    const query = `
+  match (a:Ambassador {id:$a_id})
+  merge (e:EkataPerson {id:$e_id})
+  merge (a)-[r:EKATA_ASSOCIATED]->(e)
+  `
+  
+    for (let i = 0; i < people.length; i++) {
+      let params = {}
+      params["a_id"] = ambassador.get("id")
+      params["e_id"] = people[i]["id"]
+      await neode.cypher(query, params)
+    }
+  }
+}
+
 module.exports = {
   findByExternalId: findByExternalId,
   findById: findById,
@@ -400,4 +474,5 @@ module.exports = {
   initialSyncAmbassadorToHubSpot: initialSyncAmbassadorToHubSpot,
   sendTriplerCountsToHubspot: sendTriplerCountsToHubspot,
   syncAmbassadorToHubSpot: syncAmbassadorToHubSpot,
+  updateEkataMatchScore: updateEkataMatchScore,
 }

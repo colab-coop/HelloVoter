@@ -128,6 +128,12 @@ export const ov_config = {
   blocked_carriers: getConfig("blocked_carriers", false, ""),
   ekata_api_key: getConfig("ekata_api_key", false, null),
   ekata_addon: getConfig("ekata_addon", false, null),
+
+  ambassadorEkataThreshold: parseInt(getConfig("ambassador_ekata_threshold", false, 1)),
+  ambassadorEkataPenalty: parseInt(getConfig("ambassador_ekata_penalty", false, 2)),
+  triplerEkataPenalty: parseInt(getConfig("tripler_ekata_penalty", false, 1)),
+  triplerEkataBonus: parseInt(getConfig("tripler_ekta_bonus", false, 2)),
+
   stress: getConfig("stress", false, false),
   exclude_unreg_except_in: getConfig("exclude_unreg_except_in", false, ""),
   search_tripler_max_distance: getConfig("search_tripler_max_distance", false, 150000),

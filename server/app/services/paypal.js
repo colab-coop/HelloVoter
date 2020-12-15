@@ -2,6 +2,7 @@ const paypal = require('@paypal/payouts-sdk');
 import neo4j from 'neo4j-driver';
 
 import neode from '../lib/neode';
+import { isLocked } from '../lib/fraud';
 import { ov_config } from '../lib/ov_config';
 
 let client = null;
@@ -27,7 +28,7 @@ function validateForPayment(ambassador, tripler) {
     throw 'Ambassador not approved, cannot pay';
   }
 
-  if (ambassador.get('locked')) {
+  if (isLocked(ambassador)) {
     throw 'Ambassador locked, cannot pay';
   }
 

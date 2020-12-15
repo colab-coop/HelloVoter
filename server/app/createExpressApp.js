@@ -23,6 +23,7 @@ import audit from 'morgan-body';
 import { ov_config } from './lib/ov_config';
 import ambassadorSvc from './services/ambassadors';
 import { ip } from './lib/ip';
+import { isLocked } from './lib/fraud';
 
 import {
   cqdo, _400, _401, _403, _500, _503
@@ -157,7 +158,7 @@ export function doExpressInit(log, db, qq, neode) {
         the req.externalId produced here.
       */
 
-      if (user && user.get('locked')) {
+      if (isLocked(user)) {
         return _403(res, "Your account is locked.");
       }
       else if (user) {

@@ -1,3 +1,11 @@
+import {Router} from "express"
+import format from "string-format"
+import {v4 as uuidv4} from "uuid"
+
+import {getValidCoordinates, normalizePhone} from "../../../../lib/normalizers"
+import {ValidationError} from "../../../../lib/errors"
+import {isLocked, getTrustFactors} from "../../../../lib/fraud"
+
 import {formatDate, formatNumber} from "../../../../lib/format"
 import PhoneNumber from "awesome-phonenumber"
 
@@ -22,7 +30,17 @@ function serializeName(first_name, last_name) {
   return [first_name, last_name].join(" ")
 }
 
+function getPrimaryAccount(ambassador) {
+  const edges = ambassador.get("owns_account") || []
+  for (let e = 0; e < edges.length; e++) {
+    const other = edges.get(e)?.otherNode()
+    if (other?.get("is_primary")) return other
+  }
+  return null
+}
+
 function serializeAccount(account) {
+  if (!account) return null
   let obj = {}
   ;["id", "account_id", "account_type"].forEach((x) => (obj[x] = account.get(x)))
   obj["account_data"] = !!account.get("account_data")
@@ -46,7 +64,6 @@ function serializeAmbassador(ambassador) {
     "approved",
     "quiz_completed",
     "onboarding_completed",
-    "locked",
     "payout_provider",
     "payout_additional_data",
     "admin",
@@ -55,14 +72,26 @@ function serializeAmbassador(ambassador) {
   ].forEach((x) => (obj[x] = ambassador.get(x)))
   obj["address"] = !!ambassador.get("address")
     ? JSON.parse(ambassador.get("address").replace("#", "no."))
-    : ""
-  obj["display_address"] = !!obj["address"] ? serializeAddress(obj["address"]) : ""
+    : null
+  obj["display_address"] = !!obj["address"] ? serializeAddress(obj["address"]) : null
   obj["display_name"] = serializeName(ambassador.get("first_name"), ambassador.get("last_name"))
+  obj["hs_id"] = ambassador.get("hs_id") ? ambassador.get("hs_id").toString() : null
+  const claimTriplerLimit = ambassador.get("claim_tripler_limit")
+  if (claimTriplerLimit) {
+    obj["claim_tripler_limit"] = claimTriplerLimit.toNumber()
+  }
 
-  let account = ambassador.get("owns_account").first()
-  obj["account"] = !!account ? serializeAccount(account.otherNode()) : null
+  const acct = getPrimaryAccount(ambassador)
+  obj["account"] = serializeAccount(acct)
+  obj["locked"] = isLocked(ambassador)
   obj["hs_id"] = ambassador.get("hs_id") ? ambassador.get("hs_id").toString() : ""
 
+  let claimees = ambassador.get("claims")
+  let array = []
+  for (let index = 0; index < claimees.length; index++) {
+    array.push(serializeTripler(claimees.get(index).otherNode()))
+  }
+  obj["claimees"] = array
   return obj
 }
 
@@ -75,8 +104,9 @@ function serializeAmbassadorForAdmin(ambassador) {
   obj["onboarding_completed"] = ambassador.get("onboarding_completed")
   obj["giftcard_completed"] = ambassador.get("giftcard_completed")
   obj["signup_completed"] = ambassador.get("signup_completed")
-  obj["locked"] = ambassador.get("locked")
   obj["payout_provider"] = ambassador.get("payout_provider")
+  obj["admin_bonus"] = ambassador.get("admin_bonus").toNumber() || 0
+  obj["trust_factors"] = getTrustFactors(ambassador)
 
   //claimees
   let claimees = ambassador.get("claims")

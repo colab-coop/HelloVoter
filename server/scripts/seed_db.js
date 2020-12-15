@@ -151,6 +151,7 @@ async function createAmbassador(opts) {
     ...await baseUserData(),
     quiz_results: null,
     approved: !!opts.approved,
+    // TODO: Remove "locked" from the model once we have fraud score components.
     locked: !!opts.locked,
     signup_completed: !!opts.signup_completed,
     admin: !!opts.admin,
@@ -214,6 +215,7 @@ async function seed(args) {
   ambassador = await createAmbassador({ approved: false, signupCompleted: false, createTriplers: false });
   console.log(`Ambassador created with email ${ambassador.get('email')}`);
 
+  // TODO: Remove "locked" from the model once we have fraud score components.
   console.log("Creating locked ambassador...");
   ambassador = await createAmbassador({ locked: true, approved: true, signupCompleted: true, createTriplers: true });
   console.log(`Ambassador created with email ${ambassador.get('email')}`);
@@ -222,6 +224,7 @@ async function seed(args) {
   let max = argv['max-ambassadors'] || faker.random.number({ min: 1, max: 10 });
   for (let index = 0; index < max; index++) {
     let approved = faker.random.boolean();
+    // TODO: Remove "locked" from the model once we have fraud score components.
     let locked = faker.random.boolean();
     let signupCompleted = faker.random.boolean();
 

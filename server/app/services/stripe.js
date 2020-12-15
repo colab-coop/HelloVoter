@@ -3,6 +3,7 @@ import neo4j from 'neo4j-driver';
 
 import neode from '../lib/neode';
 import { ov_config } from '../lib/ov_config';
+import { isLocked } from '../lib/fraud';
 
 async function createConnectAccount(user, bankAccountToken, acceptanceIp) {
   let address = JSON.parse(user.get('address'));
@@ -79,7 +80,7 @@ function validateForPayment(ambassador, tripler) {
     throw 'Ambassador not approved, cannot pay';
   }
 
-  if (ambassador.get('locked')) {
+  if (isLocked(ambassador)) {
     throw 'Ambassador locked, cannot pay';
   }
 

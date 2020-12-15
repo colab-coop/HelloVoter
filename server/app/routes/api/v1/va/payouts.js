@@ -59,6 +59,11 @@ module.exports = Router({mergeParams: true})
     return error(400, res, 'Payouts not supported.');
   }
 })
+
+.delete('/payouts/account', async (req, res) => {
+  return stripe.demoteStripeAccount(req, res);
+})
+
 /*
  *
  * This route is an admin route meant for creating test (sandbox) payout accounts for QA

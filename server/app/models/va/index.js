@@ -7,6 +7,9 @@
  *
  */
 module.exports = {
-  Ambassador: require('./Ambassador'),
-  Tripler: require('./Tripler')
+  Ambassador: require("./Ambassador"),
+  Tripler: require("./Tripler"),
+  EkataLocation: require("./EkataLocation"),
+  EkataPerson: require("./EkataPerson"),
+  VotingPlan: require('./VotingPlan')
 };

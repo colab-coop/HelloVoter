@@ -15,7 +15,6 @@ import {
 import {confirmTriplerEmail} from "../emails/confirmTriplerEmail"
 import ambassadorsSvc from "./ambassadors"
 
-
 /*
  *
  * findById(triplerId)
@@ -83,10 +82,10 @@ async function findRecentlyConfirmedTriplers() {
  *
  * An SMS is sent to the Ambassador that claims this Tripler, and an admin email is sent,
  *   depending on .env var configuration.
- * 
+ *
  * If the Ambassador that claims the tripler has a Hubspot ID, the Tripler counts (pending, confirmed, unconfirmed)
  * will be updated once this function is triggered. If the Ambassador does not have a Hubspot ID, the sendTriplerCountsToHubspot
- * should do nothing. 
+ * should do nothing.
  *
  */
 async function confirmTripler(triplerId) {
@@ -367,6 +366,7 @@ function buildTriplerSearchQuery(req) {
     where
       not (node)<-[:CLAIMS]-(:Ambassador)
       and not (:Ambassador)-[:WAS_ONCE]->(node)
+      and ( node.voted <> true OR node.voted is null)
       ${phoneFilter}
       ${genderFilter}
       ${ageFilter}
@@ -469,6 +469,7 @@ async function updateClaimedBirthMonth(tripler, month) {
  *   phone number at this time. The /routes side of this will do verification on the Tripler's
  *   phone number before calling this function.
  *
+ * Based on the updated Tripler verification data, the ambassador's Ekata Match Score will be updated.
  */
 async function startTriplerConfirmation(ambassador, tripler, triplerPhone, triplees, verification) {
   try {
@@ -493,11 +494,90 @@ async function startTriplerConfirmation(ambassador, tripler, triplerPhone, tripl
     triplees: JSON.stringify(triplees, null, 2),
     status: "pending",
     phone: triplerPhone,
-    verification: tripler.get("verification")
-      ? tripler.get("verification") + JSON.stringify(verification, null, 2)
-      : JSON.stringify(verification, null, 2),
+    verification: JSON.stringify(verification, null, 2), // update verification string instead of append
   })
   await ambassadorsSvc.sendTriplerCountsToHubspot(ambassador)
+  await ambassadorsSvc.updateEkataMatchScore(ambassador)
+
+  if (typeof verification[1] !== "undefined") {
+    await setTriplerEkataLocations(tripler, verification)
+    await setTriplerEkataAssociatedPeople(tripler, verification)
+  }
+}
+
+/*
+ * setTriplerEkataLocations takes a tripler and the verification (an array) returned from 
+ * the phone number checking processes used to help reduce spam / bad behavior in the system.
+ * The phone number checking functionality makes two checks, the second of which is the Ekata check. 
+ * The first check seems required, but there seem to be some cases in which the second check 
+ * doesn't exist or doesn't happen. 
+ * setTriplerEkataLocations connects the triper with "EkataLocation" nodes generated 
+ * from the locations stored in the second item in the verification array, the Ekta check. 
+ * A version of "verification" data also exists as a string on the Tripler's "verification" property.
+ * 
+*/
+async function setTriplerEkataLocations(tripler, verification) {
+  if (typeof verification[1] !== "undefined") {
+    const locations = verification[1]["name"]["result"]["current_addresses"]
+    const query = `
+  match (t:Tripler {id:$t_id})
+  merge (e:EkataLocation {id:$e_id})
+    on create set e += {
+      accuracy:$e_accuracy,
+      location_type:$e_location_type,
+      street_line_1:$e_street_line_1,
+      street_line_2:$e_street_line_2,
+      city:$e_city,
+      postal_code:$e_postal_code,
+      state_code:$e_state_code,
+      zip4:$e_zip4
+    }
+  merge (t)-[:EKATA_LOCATED]->(e)
+  `
+
+    for (let i = 0; i < locations.length; i++) {
+      let params = {}
+      params["t_id"] = tripler.get("id")
+      params["e_id"] = locations[i]["id"]
+      params["e_accuracy"] = locations[i]["lat_long"]["accuracy"]
+      params["e_location_type"] = locations[i]["location_type"]
+      params["e_street_line_1"] = locations[i]["street_line_1"]
+      params["e_street_line_2"] = locations[i]["street_line_2"]
+      params["e_city"] = locations[i]["city"]
+      params["e_postal_code"] = locations[i]["postal_code"]
+      params["e_state_code"] = locations[i]["state_code"]
+      params["e_zip4"] = locations[i]["zip4"]
+      await neode.cypher(query, params)
+    }
+  }
+}
+/*
+ * setTriplerEkataAssociatedPeople takes a tripler and the verification (an array) returned from 
+ * the phone number checking processes used to help reduce spam / bad behavior in the system.
+ * The phone number checking functionality makes two checks, the second of which is the Ekata check. 
+ * The first check seems required, but there seem to be some cases in which the second check 
+ * doesn't exist or doesn't happen. 
+ * setTriplerEkataLocations connects the triper with "EkataPerson" nodes generated 
+ * from the "associated_people" stored in the second item in the verification array, the Ekta check. 
+ * A version of "verification" data also exists as a string on the Tripler's "verification" property.
+ * 
+*/
+async function setTriplerEkataAssociatedPeople(tripler, verification) {
+  if (typeof verification[1] !== "undefined") {
+    const people = verification[1]["name"]["result"]["associated_people"]
+    const query = `
+  match (t:Tripler {id:$t_id})
+  merge (e:EkataPerson {id:$e_id})
+  merge (t)-[r:EKATA_ASSOCIATED]->(e)
+  `
+
+    for (let i = 0; i < people.length; i++) {
+      let params = {}
+      params["t_id"] = tripler.get("id")
+      params["e_id"] = people[i]["id"]
+      await neode.cypher(query, params)
+    }
+  }
 }
 
 module.exports = {

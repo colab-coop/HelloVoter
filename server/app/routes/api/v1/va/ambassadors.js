@@ -63,6 +63,7 @@ async function createAmbassador(req, res) {
       address: JSON.stringify(address, null, 2),
       quiz_results: JSON.stringify(req.body.quiz_results, null, 2) || null,
       approved: false,
+      // TODO: Remove "locked" from the model once we have fraud score components.
       locked: false,
       signup_completed: false,
       onboarding_completed: false,
@@ -136,7 +137,7 @@ async function fetchCurrentAmbassador(req, res) {
  *
  * approveAmbassdaor(req, res)
  *
- * This function sets an Ambassador to be approved:true, locked:false
+ * This function sets an Ambassador's "approved" flag to true.
  * When this function is called, an approval SMS is sent to the Ambassador.
  *
  */
@@ -171,7 +172,7 @@ async function approveAmbassador(req, res) {
 
 /*
  *
- * updateW9Ambassadaor(req, res)
+ * updateW9Ambassador(req, res)
  *
  *
  */
@@ -185,6 +186,56 @@ async function updateW9Ambassador(req, res) {
   req.neode.cypher("MATCH (a:Ambassador {id: $id}) SET a.has_w9=toBoolean($has_w9)", {
     id: req.params.ambassadorId,
     has_w9: req.params.has_w9,
+  })
+
+  return _204(res)
+}
+
+/*
+ * updateTriplerLimit(req, res)
+ *
+ * Update the maximum number of triplers an individual ambassador can claim.
+ *
+ */
+async function updateTriplerLimit(req, res) {
+  let found = await req.neode.first("Ambassador", "id", req.params.ambassadorId)
+
+  if (!found) {
+    return error(404, res, "Ambassador not found")
+  }
+
+  let newLimit = req.params.claim_tripler_limit
+  if (newLimit === null || newLimit === undefined) {
+    newLimit = "null"
+  }
+
+  req.neode.cypher(
+    "MATCH (a:Ambassador {id: $id}) SET a.claim_tripler_limit=toInteger($claim_tripler_limit)",
+    {
+      id: req.params.ambassadorId,
+      claim_tripler_limit: newLimit,
+    },
+  )
+
+  return _204(res)
+}
+
+/*
+ *
+ * updateAmbassadorAdminBonus(req, res)
+ * It gets its own function as some legacy ambassadors might not have this field, so we have to set it
+ *
+ */
+async function updateAmbassadorAdminBonus(req, res) {
+  let found = await req.neode.first("Ambassador", "id", req.params.ambassadorId)
+
+  if (!found) {
+    return error(404, res, "Ambassador not found")
+  }
+
+  req.neode.cypher("MATCH (a:Ambassador {id: $id}) SET a.admin_bonus=toInteger($admin_bonus)", {
+    id: req.params.ambassadorId,
+    admin_bonus: req.params.admin_bonus,
   })
 
   return _204(res)
@@ -213,12 +264,7 @@ async function updatePayPalApprovedAmbassador(req, res) {
  *
  * disapproveAmbassador(req, res)
  *
- * This function sets an Ambassador to approved:false and locked:true.
- *
- * This function is called from the admin panel when an admin suspects an Ambassador's account to
- *   be fraudulent. In theory, the above 'approveAmbassador' function might be called at a later
- *   time, but this has not happened in practice, I believe.
- *
+ * This function sets an Ambassador's "approved" flag to false.
  */
 async function disapproveAmbassador(req, res) {
   let found = await req.neode.first("Ambassador", "id", req.params.ambassadorId)
@@ -226,7 +272,7 @@ async function disapproveAmbassador(req, res) {
   if (!found) {
     return error(404, res, "Ambassador not found")
   }
-  //disapprove ONLY dissaproves. Before it would also lock. 
+  //disapprove ONLY dissaproves. Before it would also lock.
   let json = {...{approved: false}}
   let updated = await found.update(json)
   return _204(res)
@@ -430,13 +476,12 @@ async function deleteAmbassador(req, res) {
  * claimTriplers(req, res)
  *
  * This cypher query finds how many Triplers this Ambassador already has claimed, limits the claim list to just
- *   the Triplers that can be claimed and still remain under the CLAIM_TRIPLER_LIMIT env var, then claims them.
+ *   the Triplers that can be claimed and still remain under the CLAIM_TRIPLER_LIMIT env var (or the claim_tripler_limit
+ *   property of the ambassador, if it is set), then claims them.
  *
  * If the Ambassador has a Hubspot ID (hs_id), the Ambassador's tripler numbers are updated in HubSpot.
  */
 async function claimTriplers(req, res) {
-  let ambassador = req.user
-
   if (!req.body.triplers || req.body.triplers.length === 0) {
     return error(400, res, "Invalid request, empty list of triplers")
   }
@@ -448,9 +493,9 @@ async function claimTriplers(req, res) {
   with a, count(distinct ct) as already_claimed_count
   match(t:Tripler)
   where t.id in [${req.body.triplers.map((t) => '"' + t + '"')}]
-  with already_claimed_count, a, t, ${
+  with already_claimed_count, a, t, coalesce(a.claim_tripler_limit, ${
     ov_config.claim_tripler_limit
-  } - already_claimed_count as limit_claim
+  }) - already_claimed_count as limit_claim
   optional match (t)<-[r:CLAIMS]-(:Ambassador)
   with limit_claim, a, collect(t.id)[0..limit_claim] as unclaimed_id, type(r) as rel
   where rel is null
@@ -461,7 +506,7 @@ async function claimTriplers(req, res) {
   return t.id
   `
 
-  let collection = await req.neode.cypher(query)
+  await req.neode.cypher(query)
   await ambassadorsSvc.sendTriplerCountsToHubspot(req.user)
 
   return _204(res)
@@ -680,6 +725,16 @@ module.exports = Router({mergeParams: true})
     if (!req.authenticated) return _401(res, "Permission denied.")
     if (!req.admin) return _403(res, "Permission denied.")
     return updateW9Ambassador(req, res)
+  })
+  .put("/ambassadors/:ambassadorId/admin_bonus/:admin_bonus", (req, res) => {
+    if (!req.authenticated) return _401(res, "Permission denied.")
+    if (!req.admin) return _403(res, "Permission denied.")
+    return updateAmbassadorAdminBonus(req, res)
+  })
+  .put("/ambassadors/:ambassadorId/claim_tripler_limit/:claim_tripler_limit?", (req, res) => {
+    if (!req.authenticated) return _401(res, "Permission denied.")
+    if (!req.admin) return _403(res, "Permission denied.")
+    return updateTriplerLimit(req, res)
   })
   .put("/ambassadors/:ambassadorId/paypal_approved/:paypal_approved", (req, res) => {
     if (!req.authenticated) return _401(res, "Permission denied.")

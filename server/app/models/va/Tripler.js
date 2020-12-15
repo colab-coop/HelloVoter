@@ -78,6 +78,24 @@ module.exports = {
     eager: true,
     cascade: "detach",
   },
+  // Points to the EkataLocation(s) in which the Tripler is presumably located.
+  ekata_located: {
+    type: "relationships",
+    target: "EkataLocation",
+    relationship: "EKATA_LOCATED",
+    direction: "out",
+    eager: true,
+    cascade: "detach",
+  },
+  // Points to the EkataPerson(s) with whom the Tripler may be associated.
+  ekata_associated: {
+    type: "relationships",
+    target: "EkataPerson",
+    relationship: "EKATA_ASSOCIATED",
+    direction: "out",
+    eager: true,
+    cascade: "detach",
+  },
   // This simply points back to the Ambassador that this Tripler now is
   is_ambassador: {
     type: "node",
@@ -110,4 +128,15 @@ module.exports = {
   zip: "string",
   // The birth month (1-12) of this Tripler, according to the Ambassador.
   claimed_birth_month: "integer",
+  voted: {
+    type: "boolean",
+    default: false,
+  },
+  own_plans: {
+    type: "relationships",
+    direction: "out",
+    relationship: "OWNS",
+    target: "VotingPlan",
+    cascade: "delete"
+  }
 }
