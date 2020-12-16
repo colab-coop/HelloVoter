@@ -306,65 +306,102 @@ async function sendTriplerCountsToHubspot(ambassador) {
  */
 
 async function updateEkataMatchScore(ambassador) {
+  let ekataReport = "EKATA REPORT\n"
   //resetting (in case any validation score changed, it calculates fresh)
   let ambassadorMatches = 0
   let tripler_ekata_blemish = 0
   let ambassador_ekata_blemish = 0
   let re = /\d* \w{1,2}/
+  let triplerRe = /"address1":"(\w{1,4})/
 
   //these are still being tuned to find the best fit
 
   let ambassadorEkataThreshold = ov_config.ambassadorEkataThreshold || 1
+  ekataReport +="================================================="
+  ekataReport +="\nambassadorEkataThreshold:" + ambassadorEkataThreshold +"\n"
+  
   let ambassadorEkataPenalty = ov_config.ambassadorEkataPenalty || 2
+  ekataReport +="ambassadorEkataPenalty:" + ambassadorEkataPenalty +"\n"
+
   let triplerEkataPenalty = ov_config.triplerEkataPenalty || 1
+  ekataReport +="triplerEkataPenalty:" + triplerEkataPenalty +"\n"
+
   let triplerEkataBonus = ov_config.triplerEkataBonus || 2
+  ekataReport +="triplerEkataBonus:" + triplerEkataBonus +"\n"
+  ekataReport +="=================================================\n"
 
   let query =
     "MATCH (a:Ambassador {id:$a_id})-[:CLAIMS]->(t:Tripler) WHERE  t.status <> 'unconfirmed' RETURN t.first_name as first_name, t.last_name as last_name, t.address as address, t.verification as verification"
   let collection = await neode.cypher(query, {a_id: ambassador.get("id")})
   for (let index = 0; index < collection.records.length; index++) {
     let invidualTriplerMatchScore = 0
-    let triplerAddress = collection.records[index].get("address").toLowerCase()
-    let verificationString = collection.records[index].get("verification").toString().toLowerCase()
+    let triplerAddress = (collection.records[index].get("address") || '').toLowerCase()
+    let verificationString = (collection.records[index].get("verification") || "").toString().toLowerCase()
     let triplerProperties = []
     triplerProperties.push(collection.records[index].get("first_name").toLowerCase())
     triplerProperties.push(collection.records[index].get("last_name").toLowerCase())
-    triplerProperties.push(triplerAddress.match(re)[0].toLowerCase())
+    triplerProperties.push(triplerAddress.match(triplerRe)[1].toLowerCase())
+
+    ekataReport += "\nTRIPLER PROPERTIES: " + triplerProperties + "\n"
     for (let i in triplerProperties) {
+      ekataReport += "\n" + triplerProperties[i] + " "
       if (verificationString.includes(triplerProperties[i])) {
+
         invidualTriplerMatchScore++
+        ekataReport += "matches\n"
+      } else {
+      ekataReport += "doesn't match\n"
       }
     }
 
     if (invidualTriplerMatchScore >= 1) {
+      ekataReport += "\nthis tripler's individual match score is " + invidualTriplerMatchScore + ", which is >1, blemishes are going down"
+
     // if the individual tripler has one or more matches (good), then the overall tripler blemish is made smaller
       tripler_ekata_blemish = tripler_ekata_blemish - triplerEkataBonus
     } else {
+      ekataReport += "\nthis tripler's individual match score is " + invidualTriplerMatchScore + ", which is <1, blemishes are going up"
+
     // if the individual tripler has less than one match (bad), then the overall tripler blemish is made larger
       tripler_ekata_blemish = tripler_ekata_blemish + triplerEkataPenalty
     }
   }
+  ekataReport += "\ntripler_ekata_blemish:" + tripler_ekata_blemish
+  ekataReport +="\n=================================================\n"
+
 
   // determining the blemishness of the ambassador
 
   let verificationString = ambassador.get("verification").toLowerCase()
   let ambassadorAddress = ambassador.get("address").toLowerCase()
+
   let ambassadorProperties = [
     ambassador.get("first_name").toLowerCase(),
     ambassador.get("last_name").toLowerCase(),
     ambassadorAddress.match(re)[0].toLowerCase() ? ambassadorAddress.match(re)[0].toLowerCase() : ""
   ]
+  ekataReport += "\nAMBASSADOR PROPERTIES: " + ambassadorProperties + "\n"
+
   for (let i in ambassadorProperties) {
+    ekataReport += "\n" + ambassadorProperties[i] + " "
+
     if (verificationString.includes(ambassadorProperties[i])) {
       ambassadorMatches++
+       ekataReport += "matches\n"
+    } else {
+      ekataReport += "doesn't match\n"
     }
   }
 
   // if the ambassador does not have enough matches, levy the penalty
 
   if (ambassadorMatches < ambassadorEkataThreshold) {
+    ekataReport += "\nthis ambassador's individual match score is " + ambassadorMatches + ", which is less than the threshold, " + ambassadorEkataThreshold + "\n"
     ambassador_ekata_blemish = ambassadorEkataPenalty
   }
+  
+  let reportQuery = "MATCH (a:Ambassador {id:$a_id}) SET a.ekata_report=toString($ekataReport)"
+  await neode.cypher(reportQuery, {a_id: ambassador.get("id"), ekataReport:ekataReport})
 
   ambassador.update({
     ambassador_ekata_blemish: ambassador_ekata_blemish,

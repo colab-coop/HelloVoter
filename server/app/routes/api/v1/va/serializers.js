@@ -105,8 +105,9 @@ function serializeAmbassadorForAdmin(ambassador) {
   obj["giftcard_completed"] = ambassador.get("giftcard_completed")
   obj["signup_completed"] = ambassador.get("signup_completed")
   obj["payout_provider"] = ambassador.get("payout_provider")
-  obj["admin_bonus"] = ambassador.get("admin_bonus").toNumber() || 0
-  obj["trust_factors"] = getTrustFactors(ambassador)
+  obj["admin_bonus"] = ambassador.get("admin_bonus") || 0
+  obj["trust_factors"] = getTrustFactors(ambassador) || null
+  obj["ekata_report"] = ambassador.get("ekata_report") || ""
 
   //claimees
   let claimees = ambassador.get("claims")

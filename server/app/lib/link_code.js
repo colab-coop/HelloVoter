@@ -1,6 +1,8 @@
 import neode from './neode';
 
-const randomDigit = () => Math.floor(Math.random() * 10);
+// Avoid zero, as it is harder to pronounce unambiguously.
+// ("05" can be pronounced "oh-five"; "50" sounds like "fifteen".)
+const randomDigit = () => Math.floor(1 + Math.random() * 9);
 
 const randomDigits = (count) => {
   let digits = ""

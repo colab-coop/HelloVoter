@@ -218,6 +218,11 @@ module.exports = {
     type: "integer",
     default: null,
   },
+  //explains the ekata match scores
+  ekata_report: {
+    type: "string",
+    default: null,
+  },
   // Voting plans (actually links to start them) for Triplers canvassed by
   // this Ambassador.  There should be one of these for each confirmed Tripler.
   canvassed_plans: {

@@ -1,5 +1,6 @@
 import {v4 as uuidv4} from "uuid"
 import neode from '../lib/neode';
+import {ov_config} from "../lib/ov_config"
 import { selectTemplate, fillTemplate, getTemplateUsageCount } from '../lib/link_code';
 
 const createVotingPlan = async (voter, canvasser) => {
@@ -39,7 +40,11 @@ const reserveLinkCode = async (template) => {
 const getVotingPlan = async (linkCode) =>
   await neode.first('VotingPlan', 'link_code', linkCode);
 
+const getVotingPlanUrl = (plan) =>
+  ov_config.short_link_base_url + '/' + plan.get('link_code');
+
 module.exports = {
   createVotingPlan,
-  getVotingPlan
+  getVotingPlan,
+  getVotingPlanUrl
 };

@@ -24,9 +24,11 @@ import { ov_config } from './lib/ov_config';
 import ambassadorSvc from './services/ambassadors';
 import { ip } from './lib/ip';
 import { isLocked } from './lib/fraud';
+import { getVotingPlan } from './services/voting_plans';
+import { prepareBallotReadyUrl } from './services/ballot_ready';
 
 import {
-  cqdo, _400, _401, _403, _500, _503
+  cqdo, _400, _401, _403, _404, _500, _503
 } from './lib/utils';
 
 const router = require('./routes/createRouter.js')();
@@ -117,13 +119,9 @@ export function doExpressInit(log, db, qq, neode) {
     }
 
     // uri whitelist
-    switch (req.url) {
-      case '/':
-      case '/poke':
-        return next();
-      default:
-        break;
-    }
+    if (req.url === '/') return next();
+    if (req.url === '/poke') return next();
+    if (req.url.match(/^\/links\//)) return next();
     if (req.url.match(/^\/HelloVoterHQ.*mobile\//)) return next();
     if (req.url.match(/^\/HelloVoterHQ.*public\//)) return next();
     if (req.url.match(/^\/.*public\//)) return next();
@@ -173,6 +171,25 @@ export function doExpressInit(log, db, qq, neode) {
 
     next();
   });
+
+  // short link redirector
+  app.get('/links/:code', (req, res) =>
+    getVotingPlan(req.params.code).then(
+      (plan) => {
+        if (plan) {
+          const voter = plan.get('voter');
+          const canvasser = plan.get('canvasser');
+          if (voter || canvasser) {
+            res.redirect(prepareBallotReadyUrl(voter, canvasser));
+          } else {
+            _500(res, 'Voting plan has no voter and no canvasser.');
+          }
+        } else {
+          _404(res, 'Link code not found.');
+        }
+      }
+    )
+  );
 
   // healtcheck
   app.get('/poke', (req, res) => {

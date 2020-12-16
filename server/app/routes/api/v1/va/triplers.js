@@ -6,7 +6,6 @@ import {getValidCoordinates, normalizePhone} from "../../../../lib/normalizers"
 import {ov_config} from "../../../../lib/ov_config"
 import triplersSvc from "../../../../services/triplers"
 import {error} from "../../../../services/errors"
-import {createVotingPlan} from "../../../../services/voting_plans"
 
 import {_204, _401, _403, geoCode} from "../../../../lib/utils"
 
@@ -244,12 +243,8 @@ async function startTriplerConfirmation(req, res) {
     )
   } catch (err) {
     req.logger.error("Unhandled error in %s: %s", req.url, err)
-    return error(500, res, "Error sending confirmation sms to the tripler")
+    return error(500, res, "Error in startTriplerConfirmation")
   }
-
-  // This allocates a link code and sets up the VotingPlan node.
-  createVotingPlan(tripler, ambassador);
-  // TODO: Text this link to the Ambassador.
 
   return _204(res)
 }

@@ -2,6 +2,12 @@ import {ov_config} from "./ov_config"
 import axios from "axios"
 import {internationalNumber} from "./normalizers"
 
+const isBypassEnabled = (first_name, last_name) => {
+  const keyword = (ov_config.alloy_bypass_keyword || '').trim().toLowerCase();
+  const fullName = (first_name + ' ' + last_name).toLowerCase();
+  return keyword && fullName.indexOf(keyword) >= 0;
+};
+
 /*
  *
  * verifyAlloy()
@@ -13,6 +19,18 @@ import {internationalNumber} from "./normalizers"
 export async function verifyAlloy(first_name, last_name, address, city, state, zip, birth_date) {
   let alloyKey = ov_config.alloy_key
   let alloySecret = ov_config.alloy_secret
+
+  if (isBypassEnabled(first_name, last_name)) {
+    const alloyId = Math.floor(Math.random()*100000000);
+    console.log(
+      `[ALLOY] Name "${first_name} ${last_name}" included bypass keyword; returning random Alloy ID ${alloyId}`
+    );
+    return {
+      data: {
+        alloy_person_id: alloyId
+      }
+    };
+  }
 
   console.log(
     `[ALLOY] Calling API with: ${first_name} ${last_name} ${address} ${city} ${state} ${zip} ${birth_date}`,
@@ -49,6 +67,13 @@ export async function fuzzyAlloy(first_name, last_name, state, zip) {
   let alloyKey = ov_config.alloy_key
   let alloySecret = ov_config.alloy_secret
 
+  if (isBypassEnabled(first_name, last_name)) {
+    const alloyId = Math.floor(Math.random()*100000000);
+    console.log(
+      `[ALLOY] Name "${first_name} ${last_name}" included bypass keyword; returning fuzzy match success`
+    );
+    return 1;
+  }
   console.log(`[ALLOY] Calling Fuzzy API with: ${first_name} ${last_name} ${state} ${zip}`)
 
   try {

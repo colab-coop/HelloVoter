@@ -77,6 +77,8 @@ export const ov_config = {
   tripler_reconfirmation_message: getConfig("tripler_reconfirmation_message", true, null),
   rejection_sms_for_tripler: getConfig("rejection_sms_for_tripler", true, null),
   rejection_sms_for_ambassador: getConfig("rejection_sms_for_ambassador", true, null),
+  voting_plan_sms_for_ambassador: getConfig("voting_plan_sms_for_ambassador", false, ""), // optional so we can turn this on in staging, off in production
+  voting_plan_sms_for_tripler: getConfig("voting_plan_sms_for_tripler", false, ""), // optional so we can turn this on in staging, off in production
   ambassador_tripler_relation_max_distance: getConfig(
     "ambassador_tripler_relation_max_distance",
     false,
@@ -99,19 +101,19 @@ export const ov_config = {
   new_ambassador_signup_admin_email_subject: getConfig(
     "new_ambassador_signup_admin_email_subject",
     false,
-    null,
+    "Ambassador signed up",
   ),
   new_ambassador_signup_admin_email_body: getConfig(
     "new_ambassador_signup_admin_email_body",
     false,
-    null,
+    "",
   ),
   tripler_confirm_admin_email_subject: getConfig(
     "tripler_confirm_admin_email_subject",
     false,
-    null,
+    "Tripler confirmed",
   ),
-  tripler_confirm_admin_email_body: getConfig("tripler_confirm_admin_email_body", false, null),
+  tripler_confirm_admin_email_body: getConfig("tripler_confirm_admin_email_body", false, ""),
   disable_upgrade_sms: getConfig("disable_upgrade_sms", false, false),
   upgrade_sms_waiting_period: getConfig("upgrade_sms_waiting_period", true, null),
   upgrade_sms_schedule: getConfig("upgrade_sms_schedule", false, null),
@@ -132,7 +134,7 @@ export const ov_config = {
   ambassadorEkataThreshold: parseInt(getConfig("ambassador_ekata_threshold", false, 1)),
   ambassadorEkataPenalty: parseInt(getConfig("ambassador_ekata_penalty", false, 2)),
   triplerEkataPenalty: parseInt(getConfig("tripler_ekata_penalty", false, 1)),
-  triplerEkataBonus: parseInt(getConfig("tripler_ekta_bonus", false, 2)),
+  triplerEkataBonus: parseInt(getConfig("tripler_ekata_bonus", false, 2)),
 
   stress: getConfig("stress", false, false),
   exclude_unreg_except_in: getConfig("exclude_unreg_except_in", false, ""),
@@ -146,4 +148,10 @@ export const ov_config = {
   // Alloy
   alloy_key: getConfig("alloy_key", true, ""),
   alloy_secret: getConfig("alloy_secret", true, ""),
+  alloy_bypass_keyword: getConfig("alloy_bypass_keyword", false, ""),
+
+  // Voting plan links
+  short_link_base_url: getConfig(
+    "short_link_base_url", false, "blockpower.vote"
+  ).replace(/\/*$/, '')
 }
