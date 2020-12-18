@@ -33,6 +33,8 @@ import reverse_phone from "../../../../lib/reverse_phone"
 import {makeAdminEmail} from "../../../../emails/makeAdminEmail"
 import {getUserJsonFromRequest} from "../../../../lib/normalizers"
 
+import stripeSvc from '../../../../services/stripe';
+
 /*
  *
  * createAmbassador(req, res)
@@ -131,7 +133,14 @@ async function fetchAmbassador(req, res) {
  */
 async function fetchCurrentAmbassador(req, res) {
   if (!req.user.get) return _404(res, "No current ambassador")
-  return res.json(serializeAmbassador(req.user))
+
+  const ambassador = req.user;
+
+  // this may change dynamically
+  const meets1099Requirements = await stripeSvc.meets1099Requirements(ambassador);
+  await ambassador.update({stripe_1099_enabled: meets1099Requirements});
+
+  return res.json(serializeAmbassador(ambassador))
 }
 
 /*
@@ -325,8 +334,9 @@ async function makeAdmin(req, res) {
  *
  */
 async function signup(req, res) {
-  req.body.externalId = req.externalId
   let new_ambassador = null
+
+  req.body.externalId = req.externalId
 
   const carrierLookup = await validateCarrier(req.body.phone)
   const {
@@ -508,6 +518,56 @@ async function claimTriplers(req, res) {
     return error(400, res, "Invalid request, empty list of triplers")
   }
 
+  if (req.body.triplers.length === 0) {
+    return error(400, res, 'Invalid request, empty list of triplers');
+  }
+
+  const ambassador =  req.user;
+  const claims = ambassador.get('claims');
+  const claimedTriplerCount = claims.length; // TODO: look up more idiomatic access
+
+  let triplerLimit = ov_config.claim_tripler_limit;
+  const triplerLimitOverride = Number.parseInt(ambassador.get('claim_tripler_limit'));
+  if(Number.isSafeInteger(triplerLimitOverride)){
+    triplerLimit = triplerLimitOverride;
+  }
+
+
+  let stripeAccount = null;
+  ambassador.get('owns_account').forEach((entry) => {
+    if (entry.otherNode().get('account_type') === 'stripe' && entry.otherNode().get('is_primary')) {
+      stripeAccount = entry.otherNode();
+    }
+  });
+
+  if(stripeAccount) {
+    // we only check 1099 requirements for Stripe users
+    const meets1099Requirements = await stripeSvc.meets1099Requirements(ambassador);
+    if (!meets1099Requirements) {
+      // this ambassador hasn't completed Stripe's KYC flow, so additional constraints apply
+      const disbursementLimit = ov_config.needs_additional_1099_data_tripler_disbursement_limit;
+      const perTriplerPaymentAmount = ov_config.payout_per_tripler;
+
+      const triplerStatuses = claims.map(c => c.otherNode().get('status')); // get the confirmation status
+      const confirmedTriplerCount = triplerStatuses.filter(s => s === 'confirmed').length; // count the matches
+
+      const disbursedAmount = perTriplerPaymentAmount * confirmedTriplerCount;
+      if (disbursedAmount >= disbursementLimit) {
+        return error(400, res, 'Invalid request, please provide additional data before you can claim further triplers.');
+      }
+
+      // the tripler limit won't be dynamically adjusted for now, but be binary
+      // triplerLimit = Math.min(triplerLimit, Math.floor(disbursementLimit / perTriplerPaymentAmount));
+    }
+  }
+
+
+  const remainingClaimableTriplerCount = triplerLimit - claimedTriplerCount;
+
+  if (req.body.triplers.length > remainingClaimableTriplerCount) {
+    return error(400, res, 'Invalid request, attempting to claim too many triplers.');
+  }
+
   let query = `
   match(a:Ambassador{id: "${req.user.get("id")}"})
   with a
@@ -615,6 +675,17 @@ async function fetchCurrentAmbassadorPayouts(req, res) {
   return res.json(await ambassadorPayouts(req.user, req.neode))
 }
 
+
+async function initiate1099DataEntry(req, res) {
+  if (!req.user.get) return _404(res, "No current ambassador");
+  const ambassador = req.user;
+  const accountLink = await stripeSvc.create1099DataEntryLink(ambassador);
+  if (!accountLink) {
+    return _400(res, 'Payments account needs to be set up before more data can be provided')
+  }
+  return res.json(accountLink);
+}
+
 /*
  *
  * fetchAmbassadorPayouts(req, res)
@@ -712,6 +783,10 @@ module.exports = Router({mergeParams: true})
   .put("/ambassadors/current/complete-onboarding", (req, res) => {
     if (!req.authenticated) return _401(res, "Permission denied.")
     return completeOnboarding(req, res)
+  })
+  .get("/ambassadors/current/initiate-1099-data-entry", (req, res) => {
+    if (!req.authenticated) return _401(res, "Permission denied.")
+    return initiate1099DataEntry(req, res)
   })
   .get("/ambassadors/current/payouts", (req, res) => {
     if (!req.authenticated) return _401(res, "Permission denied.")

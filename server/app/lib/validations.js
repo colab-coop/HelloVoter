@@ -8,8 +8,6 @@ import caller_id from './caller_id';
 import reverse_phone from './reverse_phone';
 import { ValidationError } from './errors';
 
-const ENFORCE_UNIQUE = !ov_config.stress_testing;
-
 const ALLOWED_STATES = ov_config.allowed_states
   .toUpperCase()
   .split(',')
@@ -84,9 +82,6 @@ export async function validateUniquePhone(modelName, phone, existingId = null) {
  * or if it only matches the given ID (useful when updating an existing node).
  */
 export async function validateUnique(modelName, properties, existingId = null) {
-  if (!ENFORCE_UNIQUE) {
-    return true;
-  }
   const all = await neode.all(modelName, properties);
   if (all.length === 0) return true;
   if (all.length > 1) return false;

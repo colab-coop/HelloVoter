@@ -118,7 +118,8 @@ export function doExpressInit(log, db, qq, neode) {
       return _503(res, "Server is starting up.");
     }
 
-    // uri whitelist
+    // Endpoints that don't require authentication
+
     if (req.url === '/') return next();
     if (req.url === '/poke') return next();
     if (req.url.match(/^\/links\//)) return next();
@@ -128,48 +129,22 @@ export function doExpressInit(log, db, qq, neode) {
     //if (req.url.match(/^\/.*va\//)) return next();
     if (req.url.match(/\/\.\.\//)) return _400(res, "Not OK..");
 
-    try {
-      let u;
-      if (!req.header('authorization')) return _400(res, "Missing required header.");
-      let token = req.header('authorization').split(' ')[1];
-
-      if (ov_config.no_auth) u = jwt.decode(req.header('authorization').split(' ')[1]);
-      else u = jwt.verify(req.header('authorization').split(' ')[1], public_key);
-
-      /*
-      // verify props
-      if (!u.id) return _401(res, "Your token is missing a required parameter.");
-      if (u.iss !== jwt_iss) return _401(res, "Your token was issued for a different domain.");
-      if (u.aud && (
-        (ov_config.jwt_aud && u.aud !== ov_config.jwt_aud) ||
-        (!ov_config.jwt_aud && u.aud !== req.header('host'))
-      )) return _401(res, "Your token has an incorrect audience.");
-      */
-
-      req.externalId = u.id;
-      
-      let user = await ambassadorSvc.findByExternalId(u.id);
-
-      /*
-        Are you developing locally and having trouble linking your account to your test database?
-        Find a Ambassador you'd like to authenticate as and set the node's externalID parameter to 
-        the req.externalId produced here.
-      */
-
+    // Check for authentication
+    const userPromise = authenticateUser(req, res);
+    if (userPromise) {
+      const user = await userPromise;
       if (isLocked(user)) {
         return _403(res, "Your account is locked.");
       }
-      else if (user) {
+
+      if (user) {
         req.user = user;
         req.authenticated = true;
         req.admin = user.get('admin');
-      }      
-    } catch (e) {
-      console.warn(e);
-      return _401(res, "Invalid token.");
-    }
+      }
 
-    next();
+      next();
+    }
   });
 
   // short link redirector
@@ -217,4 +192,48 @@ function invite(req, res) {
  let url = 'https://ourvoiceusa.org/hellovoter/';
  if (mobile({ua:req.get('User-Agent')})) url = 'OurVoiceApp://invite?inviteCode='+req.query.inviteCode+'&'+(req.query.orgId?'orgId='+req.query.orgId:'server='+req.query.server);
  res.redirect(url);
+}
+
+// Returns a promise for the Ambassador node for the authenticated user.
+function authenticateUser(req, res) {
+  try {
+
+    if (ov_config.stress_testing && req.query.testingExternalId) {
+      // In stress testing mode, allow the client to choose any external ID.
+      req.externalId = 'testing:' + req.query.testingExternalId;
+    } else {
+      if (!req.header('authorization')) {
+        _400(res, "Missing required header.");
+        return null;
+      }
+      let token = req.header('authorization').split(' ')[1];
+      if (ov_config.no_auth) {
+        req.externalId = jwt.decode(token).id;
+      } else {
+        req.externalId = jwt.verify(token, public_key).id;
+      }
+    }
+
+    /*
+    // verify props
+    if (!u.id) return _401(res, "Your token is missing a required parameter.");
+    if (u.iss !== jwt_iss) return _401(res, "Your token was issued for a different domain.");
+    if (u.aud && (
+      (ov_config.jwt_aud && u.aud !== ov_config.jwt_aud) ||
+      (!ov_config.jwt_aud && u.aud !== req.header('host'))
+    )) return _401(res, "Your token has an incorrect audience.");
+    */
+
+    /*
+      Are you developing locally and having trouble linking your account to your test database?
+      Find a Ambassador you'd like to authenticate as and set the node's externalID parameter to 
+      the req.externalId produced here.
+    */
+  } catch (e) {
+    console.warn(e);
+    _401(res, "Invalid token.");
+    return null;
+  }
+
+  return ambassadorSvc.findByExternalId(req.externalId);
 }

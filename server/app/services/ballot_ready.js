@@ -41,7 +41,7 @@ const prepareBallotReadyUrl = (voter, canvasser) => {
     phone: voter?.get?.('phone'),
     // If the voter doesn't have an address, use the zip code of the canvasser.
     address: getAddress(voter) || getZip(canvasser),
-    utm_source: canvasser?.get?.('hs_id'),
+    utm_content: canvasser?.get?.('hs_id'),
     utm_term: voter?.get?.('hs_id'),
   };
   return BASE_URL + '?' + stringify(params);

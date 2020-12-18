@@ -120,7 +120,7 @@ async function signup(json, verification, carrierLookup) {
       latitude: parseFloat(coordinates.latitude),
       longitude: parseFloat(coordinates.longitude),
     },
-    external_id: ov_config.stress ? json.externalId + Math.random() : json.externalId,
+    external_id: json.externalId,
     verification: JSON.stringify(verification, null, 2),
     carrier_info: JSON.stringify(carrierLookup, null, 2),
     hs_id: null,
@@ -241,6 +241,7 @@ async function syncAmbassadorToHubSpot(ambassador) {
       "phone",
       "signup_completed",
       "has_w9",
+      'stripe_1099_enabled',
       "paypal_approved",
       "giftcard_completed",
       "is_admin",
@@ -491,7 +492,7 @@ async function setAmbassadorEkataAssociatedPeople(ambassador, verification) {
   merge (e:EkataPerson {id:$e_id})
   merge (a)-[r:EKATA_ASSOCIATED]->(e)
   `
-  
+
     for (let i = 0; i < people.length; i++) {
       let params = {}
       params["a_id"] = ambassador.get("id")

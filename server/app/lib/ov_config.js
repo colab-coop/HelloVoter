@@ -39,6 +39,12 @@ export const ov_config = {
     false,
     process.env.NODE_ENV === "production" ? null : "gotv.ourvoiceusa.org",
   ),
+  client_base_uri: getConfig(
+    'client_base_uri',
+    false,
+    process.env.NODE_ENV === 'production' ? 'https://blockpower.vote' :
+      (process.env.NODE_ENV === 'staging' ? 'https://stage2.app.blockpower.vote/blockpower' : 'http://localhost:3000')
+  ),
   jwt_iss: getConfig("jwt_iss", false, "ourvoiceusa.org"),
   twilio_disable: getConfig("twilio_disable", false, false),
   twilio_account_sid: getConfig("twilio_account_sid", true, null),
@@ -86,6 +92,7 @@ export const ov_config = {
   ),
   suggest_tripler_limit: getConfig("suggest_tripler_limit", false, 1000),
   claim_tripler_limit: getConfig("claim_tripler_limit", false, 12),
+  needs_additional_1099_data_tripler_disbursement_limit: getConfig("needs_additional_1099_data_tripler_disbursement_limit", false, 45000), // in cents
   payout_schedule: getConfig("payout_schedule", false, 60),
   fifo_wakeup: getConfig("fifo_wakeup", false, 300),
   disable_auto_payouts: getConfig("disable_auto_payouts", true, false),
@@ -136,7 +143,6 @@ export const ov_config = {
   triplerEkataPenalty: parseInt(getConfig("tripler_ekata_penalty", false, 1)),
   triplerEkataBonus: parseInt(getConfig("tripler_ekata_bonus", false, 2)),
 
-  stress: getConfig("stress", false, false),
   exclude_unreg_except_in: getConfig("exclude_unreg_except_in", false, ""),
   search_tripler_max_distance: getConfig("search_tripler_max_distance", false, 150000),
   payout_batch_size: getConfig("payout_batch_size", false, 100),

@@ -136,7 +136,6 @@ The meaning of each config item is as follows:
 * `TRIPLER_REMINDER_MESSAGE`: The SMS message when a tripler is reminded
 * `TRIPLER_CONFIRMATION_MESSAGE`: The SMS message when a tripler begins confirmation process
 * `TRIPLER_RECONFIRMATION_MESSAGE`: The SMS message when a tripler responds to other than YES or NO in response to confirmation message
-* `STRESS_TESTING`: If set to true, this introduces changes in the code like non-enforcement of unique constraints to facilitate stress testing. You will have to drop neode schema to be able to do stress testing.
 * `LOG_REQUESTS`: If set to true, enable request/response body logging
 * `LOG_REQUEST_MAX_BODY_LENGTH`: Maximum number of characters logged during request/response logging, default set to 1000
 * `MAKE_ADMIN_API`: Flag to enable `PUT /admin` api which makes an ambassador amin, default set to false
@@ -172,7 +171,7 @@ The meaning of each config item is as follows:
 * `EKATA_ADDON`: If Ekata is available as a Twilio add-on, set this to true.
 * `REJECTION_SMS_FOR_TRIPLER`: The SMS message that the tripler receives when they reply 'no' to the system.
 * `REJECTION_SMS_FOR_AMBASSADOR`: The SMS message that the ambassador receives when one of their triplers replies 'no' to the system.
-* `STRESS`: If stress testing, disable twilio verification and external_id uniqueness constraint.
+* `STRESS_TESTING`: If set to true, this allows the client to sign in as any external ID, without authentication.  Never set this in production!
 * `EXCLUDE_UNREG_EXCEPT_IN`: Exclude unregistered voters except in these comma-separated 2-char states.
 * `SEARCH_TRIPLER_MAX_DISTANCE`: Distance constraint on tripler search
 * `PAYOUT_BATCH_SIZE`: How many payouts to attempt per job

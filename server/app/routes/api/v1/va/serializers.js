@@ -8,6 +8,7 @@ import {isLocked, getTrustFactors} from "../../../../lib/fraud"
 
 import {formatDate, formatNumber} from "../../../../lib/format"
 import PhoneNumber from "awesome-phonenumber"
+import {ov_config} from '../../../../lib/ov_config';
 
 /*
  *
@@ -68,6 +69,7 @@ function serializeAmbassador(ambassador) {
     "payout_additional_data",
     "admin",
     "has_w9",
+    'stripe_1099_enabled',
     "paypal_approved",
   ].forEach((x) => (obj[x] = ambassador.get(x)))
   obj["address"] = !!ambassador.get("address")
@@ -92,6 +94,34 @@ function serializeAmbassador(ambassador) {
     array.push(serializeTripler(claimees.get(index).otherNode()))
   }
   obj["claimees"] = array
+
+  // if claimees length exceeds threshold value, and stripe_1099_enabled is false, mark needs_w9_kyc as true
+  const meets1099Requirements = ambassador.get('stripe_1099_enabled');
+  const hasPrimaryAccount = !!acct;
+  const isPrimaryAccountStripe = hasPrimaryAccount && (acct.get('account_type') === 'stripe');
+  if (isPrimaryAccountStripe && !meets1099Requirements) {
+    // unmet 1099 requirements are only relevant for Stripe users
+    // this ambassador hasn't completed Stripe's KYC flow, so additional constraints apply
+    const disbursementLimit = ov_config.needs_additional_1099_data_tripler_disbursement_limit;
+    const perTriplerPaymentAmount = ov_config.payout_per_tripler;
+
+    const claimeeStatuses = claimees.map(c => c.otherNode().get('status')); // get the confirmation status
+    const confirmedTriplerCount = claimeeStatuses.filter(s => s === 'confirmed').length; // count the matches
+
+    const disbursedAmount = perTriplerPaymentAmount * confirmedTriplerCount;
+
+    if (disbursedAmount >= disbursementLimit) {
+      obj['needs_additional_1099_data'] = true;
+    }
+  } else if (!hasPrimaryAccount && !meets1099Requirements) {
+    // if no payments account is set up, we assume the default will be Stripe, so to prevent immediately running into
+    // a snag, we automatically prompt the user to set up a payments account.
+    // If they set up PayPal, this will solve the problem automatically
+
+    // disable KYC threshold for any combination other than stripe == primary payments account
+    // obj['needs_primary_account_setup'] = true;
+  }
+
   return obj
 }
 

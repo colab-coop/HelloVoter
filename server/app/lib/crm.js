@@ -71,6 +71,7 @@ async function updateHubspotAmbassador(req) {
             // instead of the locked flag, which will go away.
             locked: req.locked ? req.locked : null,
             has_w9: req.has_w9 ? req.has_w9 : null,
+            stripe_1099_enabled: req.stripe_1099_enabled ? req.stripe_1099_enabled : null,
             payout_provider: req.payout_provider ? req.payout_provider : null,
             website: req.website ? req.website : null,
           },
@@ -117,6 +118,7 @@ async function createHubspotContact(req) {
             // instead of the locked flag, which will go away.
             locked: req.locked ? req.locked : null,
             has_w9: req.has_w9 ? req.has_w9 : null,
+            stripe_1099_enabled: req.stripe_1099_enabled ? req.stripe_1099_enabled : null,
             payout_provider: req.payout_provider ? req.payout_provider : null,
             website: req.website ? req.website : null,
           },

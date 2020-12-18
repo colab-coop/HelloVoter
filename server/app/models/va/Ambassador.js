@@ -97,7 +97,16 @@ module.exports = {
     type: "boolean",
     default: false,
   },
+  /**
+   * @deprecated Please use stripe_1099_enabled instead.
+   */
   has_w9: {
+    // Has this ambassador completed the Stripe KYC? This is necessary to exceed payments of $600 and send 1099s
+    type: "boolean",
+    default: false,
+  },
+  stripe_1099_enabled: {
+    // Has this ambassador completed the Stripe KYC? This is necessary to exceed payments of $600 and send 1099s
     type: "boolean",
     default: false,
   },
@@ -231,5 +240,9 @@ module.exports = {
     relationship: "CANVASSED",
     target: "VotingPlan",
     cascade: "detach"
+  },
+  voted: {
+    type: "boolean",
+    default: false,
   }
 }

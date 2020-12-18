@@ -2,8 +2,10 @@ import stripe from 'stripe';
 import neo4j from 'neo4j-driver';
 
 import neode from '../lib/neode';
-import { ov_config } from '../lib/ov_config';
-import { isLocked } from '../lib/fraud';
+import {ov_config} from '../lib/ov_config';
+import {isLocked} from '../lib/fraud';
+
+const CAPABILITY_1099_MISC = 'tax_reporting_us_1099_misc';
 
 async function createConnectAccount(user, bankAccountToken, acceptanceIp) {
   let address = JSON.parse(user.get('address'));
@@ -12,7 +14,7 @@ async function createConnectAccount(user, bankAccountToken, acceptanceIp) {
     country: 'US',
     email: user.get('email') ? user.get('email') : undefined,
     requested_capabilities: [
-      'transfers',
+      'transfers'
     ],
     business_type: 'individual',
     individual: {
@@ -46,7 +48,7 @@ async function createConnectTestAccount(user, bankAccountToken, acceptanceIp) {
     country: 'US',
     email: user.get('email') ? user.get('email') : undefined,
     requested_capabilities: [
-      'transfers',
+      'transfers'
     ],
     business_type: 'individual',
     individual: {
@@ -99,13 +101,74 @@ function getStripeAccount(ambassador) {
   let payout_account = null;
 
   ambassador.get('owns_account').forEach((entry) => {
-   if (entry.otherNode().get('account_type') === 'stripe' && entry.otherNode().get('is_primary')) {
+    if (entry.otherNode().get('account_type') === 'stripe' && entry.otherNode().get('is_primary')) {
       payout_account = entry.otherNode();
     }
   });
 
   if (payout_account) return payout_account;
   throw 'Stripe account not set for ambassador, cannot pay';
+}
+
+async function meets1099Requirements(ambassador) {
+  let stripeAccount = null;
+  try {
+    stripeAccount = getStripeAccount(ambassador);
+  } catch (e) {
+    return false;
+  }
+  const accountId = stripeAccount.get('account_id');
+  const capability = await stripe(ov_config.stripe_secret_key).accounts.retrieveCapability(accountId, CAPABILITY_1099_MISC);
+
+  if(capability && capability['status'] === 'active'){
+    // there is sufficient KYC information for 1099 issuance
+    return true;
+  }
+
+  const requirements = capability['requirements'];
+  const pastDue = requirements['past_due'];
+  const currentlyDue = requirements['currently_due'];
+  const eventuallyDue = requirements['eventually_due'];
+
+  if (Array.isArray(pastDue) && pastDue.length > 0) {
+    return false;
+  }
+  if (Array.isArray(currentlyDue) && currentlyDue.length > 0) {
+    return false;
+  }
+
+  if (Array.isArray(eventuallyDue) && eventuallyDue.length > 0) {
+    // let's ignore these for now
+    // return false;
+  }
+
+  return true;
+}
+
+async function create1099DataEntryLink(ambassador) {
+  let stripeAccount;
+  try {
+    stripeAccount = getStripeAccount(ambassador);
+  } catch (e) {
+    return null;
+  }
+  const account = stripeAccount.get('account_id');
+
+  const accountDetails = await stripe(ov_config.stripe_secret_key).accounts.update(
+    account,
+    {capabilities: {[CAPABILITY_1099_MISC]: {requested: true}}}
+  );
+
+  const returnUrl = `${ov_config.client_base_uri}/#/triplers`; // TODO: figure out means to retrieve based on env
+  const accountLink = await stripe(ov_config.stripe_secret_key).accountLinks.create({
+    account,
+    // refresh_url: 'http://localhost:8080/api/v1/va/ambassador/current/kyc-refresh',
+    // return_url: 'http://localhost:8080/api/v1/va/ambassador/current/kyc-return',
+    refresh_url: returnUrl, // TODO: add support for refresh URLs
+    return_url: returnUrl,
+    type: 'account_onboarding'
+  });
+  return accountLink;
 }
 
 function getPayoutDescription(ambassador, tripler) {
@@ -144,14 +207,20 @@ async function disburse(ambassador, tripler) {
       destination: payout_account.get('account_id'),
       transfer_group: getPayoutDescription(ambassador, tripler)
     });
-  } catch(err) {
-    await payout.update({ error: JSON.stringify(err) });
+  } catch (err) {
+    await payout.update({error: JSON.stringify(err)});
     throw err;
   }
 
   // update relationship details
-  let disbursed_at =  neo4j.default.types.LocalDateTime.fromStandardDate(new Date());
-  await payout.update({ status: 'disbursed', disbursed_at: disbursed_at, amount: amount, disbursement_id: transfer.id, error: null });
+  let disbursed_at = neo4j.default.types.LocalDateTime.fromStandardDate(new Date());
+  await payout.update({
+    status: 'disbursed',
+    disbursed_at: disbursed_at,
+    amount: amount,
+    disbursement_id: transfer.id,
+    error: null
+  });
   await payout.relateTo(payout_account, 'to_account');
 }
 
@@ -191,19 +260,27 @@ async function settle(ambassador, tripler) {
     }, {
       stripeAccount: account.get('account_id')
     });
-  } catch(err) {
-    await payout.update({ error: JSON.stringify(err) });
+  } catch (err) {
+    await payout.update({error: JSON.stringify(err)});
     throw err;
   }
 
   // update relationship details
-  let settled_at =  neo4j.default.types.LocalDateTime.fromStandardDate(new Date());
-  await payout.update({ status: 'settled', settled_at: settled_at, amount: amount, settlement_id: stripe_payout.id, error: null });
+  let settled_at = neo4j.default.types.LocalDateTime.fromStandardDate(new Date());
+  await payout.update({
+    status: 'settled',
+    settled_at: settled_at,
+    amount: amount,
+    settlement_id: stripe_payout.id,
+    error: null
+  });
 }
 
 module.exports = {
   createConnectAccount: createConnectAccount,
   createConnectTestAccount: createConnectTestAccount,
   disburse: disburse,
-  settle: settle
+  settle: settle,
+  create1099DataEntryLink,
+  meets1099Requirements
 };
