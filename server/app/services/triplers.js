@@ -525,7 +525,7 @@ async function startTriplerConfirmation(ambassador, tripler, triplerPhone, tripl
     verification: JSON.stringify(verification, null, 2), // update verification string instead of append
   })
   await ambassadorsSvc.sendTriplerCountsToHubspot(ambassador)
-  await ambassadorsSvc.updateEkataMatchScore(ambassador)
+  await ambassadorsSvc.updateTrustFactors(ambassador)
 
   if (typeof verification[1] !== "undefined") {
     await setTriplerEkataLocations(tripler, verification)

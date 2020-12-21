@@ -230,8 +230,7 @@ function authenticateUser(req, res) {
       the req.externalId produced here.
     */
   } catch (e) {
-    console.warn(e);
-    _401(res, "Invalid token.");
+    _401(res, "Invalid token: " + e);
     return null;
   }
 

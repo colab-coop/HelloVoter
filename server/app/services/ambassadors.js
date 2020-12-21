@@ -9,6 +9,7 @@ import {validateEmpty, validateUnique, assertUserPhoneAndEmail} from "../lib/val
 
 import {ValidationError} from "../lib/errors"
 import {isLocked} from "../lib/fraud"
+import {calcTripleeNameTrustFactors} from "../lib/triplee_checks"
 import {trimFields} from "../lib/utils"
 import {getValidCoordinates, normalizePhone} from "../lib/normalizers"
 import mail from "../lib/mail"
@@ -93,9 +94,8 @@ async function signup(json, verification, carrierLookup) {
   let existing_ambassador = null
 
   if (alloy_response) {
-    existing_ambassador = await neode.first("Ambassador", {
-      alloy_person_id: alloy_response.data.alloy_person_id,
-    })
+    const alloy_person_id = '' + alloy_response?.data?.alloy_person_id
+    existing_ambassador = await neode.first("Ambassador", {alloy_person_id: alloy_person_id})
   }
   //if there's a fuzzy match, approve the Ambassador
   let fuzzy = await fuzzyAlloy(
@@ -129,7 +129,7 @@ async function signup(json, verification, carrierLookup) {
   if (existing_ambassador && !existing_ambassador.get("external_id")) {
     // existing ambassador exists and does not have an external id
     // delete it and copy over the approved and alloy_person_id
-    let alloy_person_id = existing_ambassador.get("alloy_person_id")
+    const alloy_person_id = existing_ambassador.get("alloy_person_id")
     let approved = existing_ambassador.get("approved")
     //copy all the relationships from one to the other
     let query = `MATCH (old:Ambassador {alloy_person_id: $alloy_person_id})
@@ -249,10 +249,8 @@ async function syncAmbassadorToHubSpot(ambassador) {
     ].forEach((x) => (obj[x] = ambassador.get(x)))
     obj["website"] =
       "https://app.blockpower.vote/ambassadors/admin/#/volunteers/view/" + ambassador.get("id")
-    obj["hs_id"] = ambassador.get("hs_id").toString()
-    obj["alloy_person_id"] = ambassador.get("alloy_person_id")
-      ? ambassador.get("alloy_person_id").toString()
-      : null
+    obj["hs_id"] = ambassador.get("hs_id") || ""
+    obj["alloy_person_id"] = ambassador.get("alloy_person_id") || ""
     obj["locked"] = isLocked(ambassador)
     updateHubspotAmbassador(obj)
   }
@@ -265,8 +263,9 @@ async function syncAmbassadorToHubSpot(ambassador) {
 async function sendTriplerCountsToHubspot(ambassador) {
   //only continue if there's a hs_id
   console.log("ambassador id:", ambassador.get("id"))
-  if (ambassador.get("hs_id")) {
-    console.log("ambassador hs_id:", ambassador.get("hs_id").toString())
+  const hs_id = ambassador.get("hs_id") || "";
+  if (hs_id) {
+    console.log("ambassador hs_id:", hs_id)
 
     let pending_triplers_result = await neode.cypher(
       "MATCH (a:Ambassador {id: $id})-[r:CLAIMS]->(t:Tripler {status:'pending'}) RETURN t",
@@ -290,14 +289,14 @@ async function sendTriplerCountsToHubspot(ambassador) {
     ;["first_name", "last_name", "approved", "external_id"].forEach(
       (x) => (obj[x] = ambassador.get(x)),
     )
-    obj["hs_id"] = ambassador.get("hs_id").toString()
+    obj["hs_id"] = hs_id;
     obj["num_pending_triplers"] = pending_triplers_result.records.length
     obj["num_unconfirmed_triplers"] = unconfirmed_triplers_result.records.length
     obj["num_confirmed_triplers"] = confirmed_triplers_result.records.length
 
     updateHubspotAmbassador(obj)
   }
-  return ambassador.get("hs_id")
+  return hs_id;
 }
 
 /*
@@ -410,6 +409,13 @@ async function updateEkataMatchScore(ambassador) {
   })
 }
 
+async function updateTrustFactors(ambassador) {
+  await updateEkataMatchScore(ambassador);
+  const triplers = ambassador.get('claims').map(rel => rel.otherNode());
+  const trustFactors = calcTripleeNameTrustFactors(ambassador, triplers);
+  await ambassador.update(trustFactors);
+}
+
 // Returns the primary Account node for a given Ambassador.
 async function getPrimaryAccount(ambassador) {
   const edges = ambassador.get("owns_account") || []
@@ -444,7 +450,7 @@ async function unclaimTriplers(req) {
   }
 
   await sendTriplerCountsToHubspot(ambassador)
-  await updateEkataMatchScore(ambassador)
+  await updateTrustFactors(ambassador)
 }
 
 /*
@@ -512,5 +518,5 @@ module.exports = {
   initialSyncAmbassadorToHubSpot: initialSyncAmbassadorToHubSpot,
   sendTriplerCountsToHubspot: sendTriplerCountsToHubspot,
   syncAmbassadorToHubSpot: syncAmbassadorToHubSpot,
-  updateEkataMatchScore: updateEkataMatchScore,
+  updateTrustFactors: updateTrustFactors
 }

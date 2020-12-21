@@ -13,7 +13,7 @@ module.exports = {
     type: "string",
   },
   hs_id: {
-    type: "integer",
+    type: "string",
   },
   first_name: {
     type: "string",
@@ -119,14 +119,17 @@ module.exports = {
     // "stripe" or "paypal"
     type: "string",
   },
-  ambassador_ekata_blemish: {
-    type: "number",
-    default: 0,
-  },
-  tripler_ekata_blemish: {
-    type: "number",
-    default: 0,
-  },
+
+  // Trust factors (see app/lib/fraud.js for how these are weighted)
+  admin_bonus: "number",
+  ambassador_ekata_blemish: "number",
+  tripler_ekata_blemish: "number",
+  suspicious_triplee_names: "number",
+  triplee_names_matching_ambassador: "number",
+  triplee_names_matching_tripler: "number",
+  triplers_with_repeated_triplee_names: "number",
+  repeated_triplee_names_beyond_two: "number",
+
   // This relationship connects an Ambassador to a Payout. An Ambassador can have many
   //   Payouts. NOTE the tripler_id property of this relationship.
   gets_paid: {
@@ -208,23 +211,13 @@ module.exports = {
   carrier_info: "string",
 
   alloy_person_id: {
-    type: "integer",
+    type: "string",
     default: null,
-  },
-  admin_bonus: {
-    //a hopefully positive number denoting how trusted the ambassador is (but it can be negative)
-    type: "number",
-    default: 0,
-  },
-  bad_triplee_penalty: {
-    // a score measuring the quality of the ambasador's tripler triplees
-    type: "number",
-    default: 0,
   },
   // Custom, per-ambassador limit on the number of triplers that can be claimed.
   // If null, the limit will be the value of the env var CLAIM_TRIPLER_LIMIT.
   claim_tripler_limit: {
-    type: "integer",
+    type: "number",
     default: null,
   },
   //explains the ekata match scores

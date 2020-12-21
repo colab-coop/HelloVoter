@@ -54,7 +54,11 @@ async function sendSMS() {
     let delta = (new Date() - confirmed_at) / 1000;
     if (delta > waiting_period) {
       let ambassador = tripler.get('claimed');
-      fifo.add(await sms_task(tripler, ambassador));
+      if (ambassador) {
+        fifo.add(await sms_task(tripler, ambassador));
+      } else {
+        console.warn(`Skipping SMS to unclaimed tripler ${tripler.get('phone')}`);
+      }
     }
   }));
 }

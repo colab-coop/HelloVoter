@@ -31,7 +31,6 @@ export async function verifyAlloy(first_name, last_name, address, city, state, z
       }
     };
   }
-
   console.log(
     `[ALLOY] Calling API with: ${first_name} ${last_name} ${address} ${city} ${state} ${zip} ${birth_date}`,
   )

@@ -3,29 +3,27 @@
 exports[`triplers search query with age only 1`] = `
 "
     match (a:Ambassador {id: \\"123\\"})
-    with a.location as a_location
-    match (node:Tripler)
-    with a_location, node
+    match (node:Tripler {status:\\"unconfirmed\\"})
     where
-      not ()-[:CLAIMS]->(node)
-      and not ()-[:WAS_ONCE]->(node)
+      not (node)<-[:CLAIMS]-(:Ambassador)
+      and not (:Ambassador)-[:WAS_ONCE]->(node)
+      and ( node.voted <> true OR node.voted is null)
       
       
       and node.age_decade in [\\"20-29\\"]
       
-      and node.zip starts with left(\\"12345\\", 3)
-    with a_location, node, null as first_n_q, null as last_n_q
-    with a_location, node, first_n_q, last_n_q,
+    with a.location as a_location, node,a
+    limit 500
+    with a, a_location, node, null as first_n_q, null as last_n_q
+    with a, a_location, node, first_n_q, last_n_q,
       
     0 as score1, 0 as score2, 0 as score3
   
     with
-      node, (score1 + score2 + score3) / 3 as avg_score,
-      distance(a_location, node.location) / 10000 as distance
-    with
-      node, avg_score + (1 / distance) * 0 as final_score
-    return node, final_score
-    order by final_score desc, node.last_name asc, node.first_name asc
+      a, node,  avg(score1 + score2 + score3) + (10000 /  distance(a_location, node.location)) * 0 as final_score, distance(a_location, node.location) as distance
+    optional match (s:SocialMatch {source_id: \\"123\\"})-[:HAS_SOCIAL_MATCH]-(node)
+    RETURN node, case when s.similarity_metric is null then 0 else s.similarity_metric end as similarity_metric
+    order by similarity_metric desc, final_score desc
     limit 100
   "
 `;
@@ -33,31 +31,29 @@ exports[`triplers search query with age only 1`] = `
 exports[`triplers search query with everything 1`] = `
 "
     match (a:Ambassador {id: \\"123\\"})
-    with a.location as a_location
     CALL db.index.fulltext.queryNodes(\\"triplerFullNameIndex\\", \\"*foo* *bar*\\") YIELD node
-    with a_location, node
     where
-      not ()-[:CLAIMS]->(node)
-      and not ()-[:WAS_ONCE]->(node)
+      not (node)<-[:CLAIMS]-(:Ambassador)
+      and not (:Ambassador)-[:WAS_ONCE]->(node)
+      and ( node.voted <> true OR node.voted is null)
       and node.phone in [\\"15551212\\"]
-      and node.gender in [\\"F\\", \\"U\\"]
+      and node.gender in [\\"F\\"]
       and node.age_decade in [\\"20-29\\"]
       and node.msa in [\\"Jacksonville, FL area\\"]
-      
-    with a_location, node, \\"foo\\" as first_n_q, \\"bar\\" as last_n_q
-    with a_location, node, first_n_q, last_n_q,
+    with a.location as a_location, node,a
+    limit 500
+    with a, a_location, node, \\"foo\\" as first_n_q, \\"bar\\" as last_n_q
+    with a, a_location, node, first_n_q, last_n_q,
       
     apoc.text.levenshteinSimilarity(replace(replace(toLower(node.full_name), '-', ''), \\"'\\", ''), first_n_q + ' ' + last_n_q) as score1,
     apoc.text.jaroWinklerDistance(replace(replace(toLower(node.full_name), '-', ''), \\"'\\", ''), first_n_q + ' ' + last_n_q) as score2,
     apoc.text.sorensenDiceSimilarity(replace(replace(toLower(node.full_name), '-', ''), \\"'\\", ''), first_n_q + ' ' + last_n_q) as score3
   
     with
-      node, (score1 + score2 + score3) / 3 as avg_score,
-      distance(a_location, node.location) / 10000 as distance
-    with
-      node, avg_score + (1 / distance) * 0.5 as final_score
-    return node, final_score
-    order by final_score desc, node.last_name asc, node.first_name asc
+      a, node,  avg(score1 + score2 + score3) + (10000 /  distance(a_location, node.location)) * 0.5 as final_score, distance(a_location, node.location) as distance
+    optional match (s:SocialMatch {source_id: \\"123\\"})-[:HAS_SOCIAL_MATCH]-(node)
+    RETURN node, case when s.similarity_metric is null then 0 else s.similarity_metric end as similarity_metric
+    order by similarity_metric desc, final_score desc
     limit 100
   "
 `;
@@ -65,31 +61,29 @@ exports[`triplers search query with everything 1`] = `
 exports[`triplers search query with firstName only 1`] = `
 "
     match (a:Ambassador {id: \\"123\\"})
-    with a.location as a_location
     CALL db.index.fulltext.queryNodes(\\"triplerFirstNameIndex\\", \\"*foo*\\") YIELD node
-    with a_location, node
     where
-      not ()-[:CLAIMS]->(node)
-      and not ()-[:WAS_ONCE]->(node)
+      not (node)<-[:CLAIMS]-(:Ambassador)
+      and not (:Ambassador)-[:WAS_ONCE]->(node)
+      and ( node.voted <> true OR node.voted is null)
       
       
       
       
-      and node.zip starts with left(\\"12345\\", 3)
-    with a_location, node, \\"foo\\" as first_n_q, null as last_n_q
-    with a_location, node, first_n_q, last_n_q,
+    with a.location as a_location, node,a
+    limit 500
+    with a, a_location, node, \\"foo\\" as first_n_q, null as last_n_q
+    with a, a_location, node, first_n_q, last_n_q,
       
     apoc.text.levenshteinSimilarity(replace(replace(toLower(node.first_name), '-', ''), \\"'\\", ''), first_n_q) as score1,
     apoc.text.jaroWinklerDistance(replace(replace(toLower(node.first_name), '-', ''), \\"'\\", ''), first_n_q) as score2,
     apoc.text.sorensenDiceSimilarity(replace(replace(toLower(node.first_name), '-', ''), \\"'\\", ''), first_n_q) as score3
   
     with
-      node, (score1 + score2 + score3) / 3 as avg_score,
-      distance(a_location, node.location) / 10000 as distance
-    with
-      node, avg_score + (1 / distance) * 0 as final_score
-    return node, final_score
-    order by final_score desc, node.last_name asc, node.first_name asc
+      a, node,  avg(score1 + score2 + score3) + (10000 /  distance(a_location, node.location)) * 0 as final_score, distance(a_location, node.location) as distance
+    optional match (s:SocialMatch {source_id: \\"123\\"})-[:HAS_SOCIAL_MATCH]-(node)
+    RETURN node, case when s.similarity_metric is null then 0 else s.similarity_metric end as similarity_metric
+    order by similarity_metric desc, final_score desc
     limit 100
   "
 `;
@@ -97,31 +91,29 @@ exports[`triplers search query with firstName only 1`] = `
 exports[`triplers search query with fullName only 1`] = `
 "
     match (a:Ambassador {id: \\"123\\"})
-    with a.location as a_location
     CALL db.index.fulltext.queryNodes(\\"triplerFullNameIndex\\", \\"*foo* *bar*\\") YIELD node
-    with a_location, node
     where
-      not ()-[:CLAIMS]->(node)
-      and not ()-[:WAS_ONCE]->(node)
+      not (node)<-[:CLAIMS]-(:Ambassador)
+      and not (:Ambassador)-[:WAS_ONCE]->(node)
+      and ( node.voted <> true OR node.voted is null)
       
       
       
       
-      
-    with a_location, node, \\"foo\\" as first_n_q, \\"bar\\" as last_n_q
-    with a_location, node, first_n_q, last_n_q,
+    with a.location as a_location, node,a
+    limit 500
+    with a, a_location, node, \\"foo\\" as first_n_q, \\"bar\\" as last_n_q
+    with a, a_location, node, first_n_q, last_n_q,
       
     apoc.text.levenshteinSimilarity(replace(replace(toLower(node.full_name), '-', ''), \\"'\\", ''), first_n_q + ' ' + last_n_q) as score1,
     apoc.text.jaroWinklerDistance(replace(replace(toLower(node.full_name), '-', ''), \\"'\\", ''), first_n_q + ' ' + last_n_q) as score2,
     apoc.text.sorensenDiceSimilarity(replace(replace(toLower(node.full_name), '-', ''), \\"'\\", ''), first_n_q + ' ' + last_n_q) as score3
   
     with
-      node, (score1 + score2 + score3) / 3 as avg_score,
-      distance(a_location, node.location) / 10000 as distance
-    with
-      node, avg_score + (1 / distance) * 0 as final_score
-    return node, final_score
-    order by final_score desc, node.last_name asc, node.first_name asc
+      a, node,  avg(score1 + score2 + score3) + (10000 /  distance(a_location, node.location)) * 0 as final_score, distance(a_location, node.location) as distance
+    optional match (s:SocialMatch {source_id: \\"123\\"})-[:HAS_SOCIAL_MATCH]-(node)
+    RETURN node, case when s.similarity_metric is null then 0 else s.similarity_metric end as similarity_metric
+    order by similarity_metric desc, final_score desc
     limit 100
   "
 `;
@@ -129,31 +121,29 @@ exports[`triplers search query with fullName only 1`] = `
 exports[`triplers search query with lastName only 1`] = `
 "
     match (a:Ambassador {id: \\"123\\"})
-    with a.location as a_location
     CALL db.index.fulltext.queryNodes(\\"triplerLastNameIndex\\", \\"*bar*\\") YIELD node
-    with a_location, node
     where
-      not ()-[:CLAIMS]->(node)
-      and not ()-[:WAS_ONCE]->(node)
+      not (node)<-[:CLAIMS]-(:Ambassador)
+      and not (:Ambassador)-[:WAS_ONCE]->(node)
+      and ( node.voted <> true OR node.voted is null)
       
       
       
       
-      and node.zip starts with left(\\"12345\\", 3)
-    with a_location, node, null as first_n_q, \\"bar\\" as last_n_q
-    with a_location, node, first_n_q, last_n_q,
+    with a.location as a_location, node,a
+    limit 500
+    with a, a_location, node, null as first_n_q, \\"bar\\" as last_n_q
+    with a, a_location, node, first_n_q, last_n_q,
       
     apoc.text.levenshteinSimilarity(replace(replace(toLower(node.last_name), '-', ''), \\"'\\", ''), last_n_q) as score1,
     apoc.text.jaroWinklerDistance(replace(replace(toLower(node.last_name), '-', ''), \\"'\\", ''), last_n_q) as score2,
     apoc.text.sorensenDiceSimilarity(replace(replace(toLower(node.last_name), '-', ''), \\"'\\", ''), last_n_q) as score3
   
     with
-      node, (score1 + score2 + score3) / 3 as avg_score,
-      distance(a_location, node.location) / 10000 as distance
-    with
-      node, avg_score + (1 / distance) * 0 as final_score
-    return node, final_score
-    order by final_score desc, node.last_name asc, node.first_name asc
+      a, node,  avg(score1 + score2 + score3) + (10000 /  distance(a_location, node.location)) * 0 as final_score, distance(a_location, node.location) as distance
+    optional match (s:SocialMatch {source_id: \\"123\\"})-[:HAS_SOCIAL_MATCH]-(node)
+    RETURN node, case when s.similarity_metric is null then 0 else s.similarity_metric end as similarity_metric
+    order by similarity_metric desc, final_score desc
     limit 100
   "
 `;
@@ -161,29 +151,27 @@ exports[`triplers search query with lastName only 1`] = `
 exports[`triplers search query without any parameters 1`] = `
 "
     match (a:Ambassador {id: \\"123\\"})
-    with a.location as a_location
-    match (node:Tripler)
-    with a_location, node
+    match (node:Tripler {status:\\"unconfirmed\\"})
     where
-      not ()-[:CLAIMS]->(node)
-      and not ()-[:WAS_ONCE]->(node)
+      not (node)<-[:CLAIMS]-(:Ambassador)
+      and not (:Ambassador)-[:WAS_ONCE]->(node)
+      and ( node.voted <> true OR node.voted is null)
       
       
       
       
-      and node.zip starts with left(\\"12345\\", 3)
-    with a_location, node, null as first_n_q, null as last_n_q
-    with a_location, node, first_n_q, last_n_q,
+    with a.location as a_location, node,a
+    limit 500
+    with a, a_location, node, null as first_n_q, null as last_n_q
+    with a, a_location, node, first_n_q, last_n_q,
       
     0 as score1, 0 as score2, 0 as score3
   
     with
-      node, (score1 + score2 + score3) / 3 as avg_score,
-      distance(a_location, node.location) / 10000 as distance
-    with
-      node, avg_score + (1 / distance) * 0 as final_score
-    return node, final_score
-    order by final_score desc, node.last_name asc, node.first_name asc
+      a, node,  avg(score1 + score2 + score3) + (10000 /  distance(a_location, node.location)) * 0 as final_score, distance(a_location, node.location) as distance
+    optional match (s:SocialMatch {source_id: \\"123\\"})-[:HAS_SOCIAL_MATCH]-(node)
+    RETURN node, case when s.similarity_metric is null then 0 else s.similarity_metric end as similarity_metric
+    order by similarity_metric desc, final_score desc
     limit 100
   "
 `;

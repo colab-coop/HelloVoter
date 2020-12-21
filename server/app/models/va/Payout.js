@@ -11,6 +11,10 @@ module.exports = {
   },
   // This indicates the amount the payout to the Ambassador should be, in USD cents. eg 2000 equals $20.00USD
   amount: {
+    // TODO(ping): This has always been type "integer", but that causes Neode to
+    // return a {high: 123, low: 456} object, so the type should really be "number".
+    // We're not changing this for now (2020-12-19) for fear of breaking anything,
+    // but we should clean this up after the Georgia runoffs.
     type: 'integer',
     required: true
   },

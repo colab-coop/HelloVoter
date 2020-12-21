@@ -16,6 +16,7 @@ import neode from '../app/lib/neode.js';
 import addresses from './seed_data/addresses.json';
 import { normalizePhone } from '../app/lib/normalizers';
 import yargs from 'yargs';
+import { updateTrustFactors } from '../app/services/ambassadors';
 
 let argv = null;
 
@@ -138,9 +139,9 @@ async function createTripler({ status }) {
     ...await baseUserData(),
     status: argv['force-unconfirmed'] ? 'unconfirmed' : status,
     triplees: JSON.stringify([
-      faker.name.findName(),
-      faker.name.findName(),
-      faker.name.findName(),
+      {first_name: faker.name.firstName(), last_name: faker.name.lastName()},
+      {first_name: faker.name.firstName(), last_name: faker.name.lastName()},
+      {first_name: faker.name.firstName(), last_name: faker.name.lastName()}
     ]),
   }
   return neode.create('Tripler', json);
@@ -166,6 +167,9 @@ async function createAmbassador(opts) {
       console.log(`Creating ${status} tripler ${index + 1} of ${max} ...`);
       let tripler = await createTripler({ status });
       await new_ambassador.relateTo(tripler, 'claims');
+    }
+    if (status === 'confirmed') {
+      updateTrustFactors(ambassador);
     }
   }
   return new_ambassador;

@@ -12,6 +12,7 @@
     "seed:fresh": "babel-node scripts/seed_db.js seedall --empty",
     "test": "reset && npm run sandboxdatabase && npm run genkeys && JUNIT_REPORT_PATH=test-result/result.xml JUNIT_REPORT_STACK=1 nyc mocha --exit --file ./test/lib/config.js --recursive --require @babel/register --timeout 25000 --colors --reporter mocha-jenkins-reporter || true",
     "test:snapshots": "jest",
+    "jest": "jest",
     "start": "node node_modules/nodemon/bin/nodemon.js --signal SIGKILL --exec babel-node app/server.js 2>&1 | tee -a hellovoter.log"
   },
   "author": "Our Voice USA",
