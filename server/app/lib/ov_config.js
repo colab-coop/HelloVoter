@@ -143,6 +143,14 @@ export const ov_config = {
   triplerEkataPenalty: parseInt(getConfig("tripler_ekata_penalty", false, 1)),
   triplerEkataBonus: parseInt(getConfig("tripler_ekata_bonus", false, 2)),
 
+  trust_weight_ambassador_ekata_blemish: parseFloat(getConfig("trust_weight_ambassador_ekata_blemish", false, -1)),
+  trust_weight_tripler_ekata_blemish: parseFloat(getConfig("trust_weight_tripler_ekata_blemish", false, -1)),
+  trust_weight_suspicious_triplee_names: parseFloat(getConfig("trust_weight_suspicious_triplee_names", false, -1)),
+  trust_weight_triplee_names_matching_ambassador: parseFloat(getConfig("trust_weight_triplee_names_matching_ambassador", false, -1)),
+  trust_weight_triplee_names_matching_tripler: parseFloat(getConfig("trust_weight_triplee_names_matching_tripler", false, -1)),
+  trust_weight_repeated_triplee_names_beyond_two: parseFloat(getConfig("trust_weight_repeated_triplee_names_beyond_two", false, -1)),
+  trust_weight_triplers_with_repeated_triplee_names: parseFloat(getConfig("trust_weight_triplers_with_repeated_triplee_names", false, -1)),
+
   exclude_unreg_except_in: getConfig("exclude_unreg_except_in", false, ""),
   search_tripler_max_distance: getConfig("search_tripler_max_distance", false, 150000),
   payout_batch_size: getConfig("payout_batch_size", false, 100),
@@ -151,10 +159,12 @@ export const ov_config = {
   twilio_msg_svc_sid: getConfig("twilio_msg_svc_sid", false, null),
   neo4j_encryption: getConfig("neo4j_encryption", false, "ON"),
   hubspot_api_key: getConfig("hubspot_api_key", false, ""),
+  tripler_search_name_boost: getConfig("tripler_search_name_boost", false, 1),
+  alloy_bypass_keyword: getConfig("alloy_bypass_keyword", false, ""),
+  fraud_threshold: getConfig("fraud_threshold", false, -8),
   // Alloy
   alloy_key: getConfig("alloy_key", true, ""),
   alloy_secret: getConfig("alloy_secret", true, ""),
-  alloy_bypass_keyword: getConfig("alloy_bypass_keyword", false, ""),
 
   // Voting plan links
   short_link_base_url: getConfig(

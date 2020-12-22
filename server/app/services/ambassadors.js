@@ -96,6 +96,8 @@ async function signup(json, verification, carrierLookup) {
   if (alloy_response) {
     const alloy_person_id = '' + alloy_response?.data?.alloy_person_id
     existing_ambassador = await neode.first("Ambassador", {alloy_person_id: alloy_person_id})
+    console.log("my ambassador:",existing_ambassador)
+    console.log("testing:",alloy_person_id)
   }
   //if there's a fuzzy match, approve the Ambassador
   let fuzzy = await fuzzyAlloy(
@@ -132,20 +134,26 @@ async function signup(json, verification, carrierLookup) {
     const alloy_person_id = existing_ambassador.get("alloy_person_id")
     let approved = existing_ambassador.get("approved")
     //copy all the relationships from one to the other
-    let query = `MATCH (old:Ambassador {alloy_person_id: $alloy_person_id})
+    //turn the placeholder ambassador into "DummyAmbassador"
+    let query = `MATCH (old:Ambassador {alloy_person_id: toString($alloy_person_id)})
               MATCH (new:Ambassador {id: $new_ambassador})
               OPTIONAL MATCH (old)-[out:HAS_SOCIAL_MATCH]->(s1:SocialMatch)
               OPTIONAL MATCH (old)<-[in:HAS_SOCIAL_MATCH]-(s2:SocialMatch)
               WITH new, old, collect(distinct s1) as outs, collect(distinct s2) as ins
               FOREACH (x in outs | CREATE (new)-[:HAS_SOCIAL_MATCH]->(x))
-              FOREACH (y in ins | CREATE (new)<-[:HAS_SOCIAL_MATCH]-(y))`
-
+              FOREACH (y in ins | CREATE (new)<-[:HAS_SOCIAL_MATCH]-(y))
+              WITH new, old
+              MERGE (new)-[:HAD_PLACEHOLDER]->(old)
+              SET old:DummyAmbassador
+              REMOVE old:Ambassador
+              SET new.alloy_person_id=old.alloy_person_id
+              SET new.approved=old.approved
+              RETURN new, old
+              `
     let status = await neode.cypher(query, {
       alloy_person_id: existing_ambassador.get("alloy_person_id"),
       new_ambassador: new_ambassador.get("id"),
     })
-    existing_ambassador.delete()
-    new_ambassador.update({alloy_person_id: alloy_person_id, approved: approved})
   }
 
   // send email in the background
@@ -186,12 +194,9 @@ async function initialSyncAmbassadorToHubSpot(ambassador) {
   //only continue if there's no hs_id
 
   let obj = {}
-  ;["first_name", "last_name", "approved", "email", "phone", "external_id"].forEach(
+  ;["first_name", "last_name", "approved", "email", "phone", "external_id", "alloy_person_id"].forEach(
     (x) => (obj[x] = ambassador.get(x)),
   )
-  obj["alloy_person_id"] = ambassador.get("alloy_person_id")
-    ? ambassador.get("alloy_person_id").toString()
-    : null
   obj["website"] =
     "https://app.blockpower.vote/ambassadors/admin/#/volunteers/view/" + ambassador.get("id")
   if (!ambassador.get("hs_id")) {
@@ -372,8 +377,8 @@ async function updateEkataMatchScore(ambassador) {
 
   // determining the blemishness of the ambassador
 
-  let verificationString = ambassador.get("verification").toLowerCase()
-  let ambassadorAddress = ambassador.get("address").toLowerCase()
+  let verificationString = (ambassador.get("verification") || '').toLowerCase()
+  let ambassadorAddress = (ambassador.get("address") || '').toLowerCase()
 
   let ambassadorProperties = [
     ambassador.get("first_name").toLowerCase(),
@@ -411,7 +416,7 @@ async function updateEkataMatchScore(ambassador) {
 
 async function updateTrustFactors(ambassador) {
   await updateEkataMatchScore(ambassador);
-  const triplers = ambassador.get('claims').map(rel => rel.otherNode());
+  const triplers = (ambassador.get('claims') || []).map(rel => rel.otherNode());
   const trustFactors = calcTripleeNameTrustFactors(ambassador, triplers);
   await ambassador.update(trustFactors);
 }

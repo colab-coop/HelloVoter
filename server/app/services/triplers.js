@@ -342,6 +342,7 @@ function calculateQueryPoints(query) {
  */
 function buildTriplerSearchQuery(req) {
   const {firstName, lastName, phone, distance, age, gender, msa} = req.query
+  const tripler_search_name_boost = ov_config.tripler_search_name_boost || 1 
 
   // Add an optional constraint for performance.
   const {zip} = JSON.parse(req.user.get("address"))
@@ -407,10 +408,10 @@ function buildTriplerSearchQuery(req) {
     with a, a_location, node, first_n_q, last_n_q,
       ${stringDistScores}
     with
-      a, node,  avg(score1 + score2 + score3) + (10000 /  distance(a_location, node.location)) * ${distanceValue} as final_score, distance(a_location, node.location) as distance
+      a, node,  avg(score1 + score2 + score3)*${tripler_search_name_boost} as namecloseness, avg(score1 + score2 + score3)*${tripler_search_name_boost} + (10000 /  distance(a_location, node.location)) * ${distanceValue} as final_score, distance(a_location, node.location) as distance
     optional match (s:SocialMatch {source_id: "${req.user.get("id")}"})-[:HAS_SOCIAL_MATCH]-(node)
-    RETURN node, case when s.similarity_metric is null then 0 else s.similarity_metric end as similarity_metric
-    order by similarity_metric desc, final_score desc
+    RETURN node, namecloseness, case when s.similarity_metric is null then 0 else s.similarity_metric end as similarity_metric
+    order by namecloseness desc, similarity_metric desc, final_score desc
     limit 100
   `
 }

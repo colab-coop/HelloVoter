@@ -183,3 +183,14 @@ The meaning of each config item is as follows:
 * `ALLOY_KEY`: The API key for Alloy Verify API
 * `ALLOY_SECRET`: The API secret for Alloy Verify API
 * `ALLOW_BONUS`: Defines if we are allowing upgrade bonus payments for triplers who upgrade to become ambassadors (upgrades identified by matching phone numbers
+* `AMBASSADOR_EKATA_THRESHOLD`: Number defining how many of the following parameters must have a match from Ekata on ambassador signup in order for the ambassador to not accrue an ambassador_ekata_blemish - first name, last name, first 4 characters of address for that phone number
+* `AMBASSADOR_EKATA_PENALTY`: Number defining how many ambassador_ekata_blemish points are accrued by the ambassador when they do not reach the above thereshold
+* `TRIPLER_EKATA_PENALTY`: Number defining how many tripler_ekata_blemish points are accrued by the ambassador when a Tripler they contacted does not have any matches for first name, last name nor address in Ekata data returned for the Tripler's phone number 
+* `TRIPLER_EKATA_BONUS`: Number defining how many tripler_ekata_blemsih points are deducted for for the ambassador when a Tripler they contacted DOES have matches for first name, last name or address in Ekata data returned for the Tripler's phone number
+* `SHORT_LINK_BASE_URL`: "www.blockpower.vote" - Sets the URL for BallotReady links (or other links) sent in text messages
+* `VOTING_PLAN_SMS_FOR_TRIPLER`: Copy for SMS sent to a tripler with their custom BallotReady URL
+* `VOTING_PLAN_SMS_FOR_AMBASSADOR`: Copy for SMS sent to a ambassador with their custom BallotReady URL
+* `NEEDS_ADDITIONAL_1099_DATA_TRIPLER_DISBURSEMENT_LIMIT`: Threshold of total pending + disbursed + settled (settled is used for PayPal only) payouts after which an ambassador must complete the Stripe 1099 flow to provide SSN and DOB to Stripe. Set in cents, e.g. 45000 = $450 of total earnings
+* `CLIENT_BASE_URI:`: Base URL to return ambassador to following completion of above Stripe flow  
+* `FRAUD_THRESHOLD`: Amount of fraud points after which an ambassador's account will automatically be locked
+* `TRIPLER_SEARCH_NAME_BOOST`: Number, e.g. "5". Factor by which we weight name matchiness in Tripler search results

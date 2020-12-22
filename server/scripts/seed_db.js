@@ -101,8 +101,10 @@ async function randomPhone(model) {
 
 async function emptyDatabase() {
   console.log("Emptying database...");
-  await neode.deleteAll('Ambassador');
-  await neode.deleteAll('Tripler');
+  for (const label of neode.models.keys()) {
+    console.log(`Deleting ${label} nodes...`);
+    await neode.deleteAll(label);
+  }
 }
 
 async function baseUserData() {
@@ -169,7 +171,7 @@ async function createAmbassador(opts) {
       await new_ambassador.relateTo(tripler, 'claims');
     }
     if (status === 'confirmed') {
-      updateTrustFactors(ambassador);
+      updateTrustFactors(new_ambassador);
     }
   }
   return new_ambassador;
