@@ -1,7 +1,7 @@
 import {v4 as uuidv4} from "uuid"
 import stringFormat from "string-format"
 import {verifyAlloy, fuzzyAlloy} from "../lib/alloy"
-import {getAmbassadorHSID, updateHubspotAmbassador, createHubspotContact} from "../lib/crm"
+import {getContactHSID, updateHubspotAmbassador, createHubspotContact} from "../lib/crm"
 
 import neode from "../lib/neode"
 
@@ -201,10 +201,10 @@ async function initialSyncAmbassadorToHubSpot(ambassador) {
     "https://app.blockpower.vote/ambassadors/admin/#/volunteers/view/" + ambassador.get("id")
   if (!ambassador.get("hs_id")) {
     console.log("no hs id, gettig it from hs")
-    let hs_response = await getAmbassadorHSID(ambassador.get("email"))
+    let hs_response = await getContactHSID(ambassador.get("email"))
     if (!hs_response) {
       createHubspotContact(obj)
-      hs_response = await getAmbassadorHSID(ambassador.get("email"))
+      hs_response = await getContactHSID(ambassador.get("email"))
     }
 
     if (!hs_response) {

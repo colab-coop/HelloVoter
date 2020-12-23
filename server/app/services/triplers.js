@@ -15,6 +15,7 @@ import {
 import {confirmTriplerEmail} from "../emails/confirmTriplerEmail"
 import ambassadorsSvc from "./ambassadors"
 import {createVotingPlan, getVotingPlanUrl} from "./voting_plans"
+import {getContactHSID, updateHubspotAmbassador, createHubspotContact} from "../lib/crm"
 
 /*
  *
@@ -132,7 +133,6 @@ async function confirmTripler(triplerId) {
     throw "Invalid status, cannot confirm"
   }
 
-  // This allocates a link code and sets up the VotingPlan node.
   const plan = await createVotingPlan(tripler, ambassador);
 
   if (ov_config.voting_plan_sms_for_tripler) {
@@ -208,7 +208,7 @@ async function confirmTripler(triplerId) {
     await mail(ov_config.admin_emails, null, null, subject, body)
   }, 100)
 
-  await ambassadorsSvc.sendTriplerCountsToHubspot(ambassador)
+  // await ambassadorsSvc.sendTriplerCountsToHubspot(ambassador)
 }
 
 /*
@@ -501,6 +501,8 @@ async function updateClaimedBirthMonth(tripler, month) {
  * Based on the updated Tripler verification data, the ambassador's Ekata Match Score will be updated.
  */
 async function startTriplerConfirmation(ambassador, tripler, triplerPhone, triplees, verification) {
+  await syncTriplerHubSpot(tripler)
+
   try {
     await sms(
       triplerPhone,
@@ -606,6 +608,36 @@ async function setTriplerEkataAssociatedPeople(tripler, verification) {
       params["e_id"] = people[i]["id"]
       await neode.cypher(query, params)
     }
+  }
+}
+
+async function syncTriplerHubSpot(tripler) {
+  const email = tripler.get("alloy_person_id") + "@faux.blockpower.vote"
+    if(!tripler.get("hs_id")){
+    await getContactHSID(email)
+  }
+
+  if (!tripler.get("hs_id")) {
+    let obj = {}
+    console.log("no hs id, gettig it from hs")
+    let hs_response = await getContactHSID(email)
+    if (!hs_response) {
+      obj["email"] = email
+      createHubspotContact(obj)
+      hs_response = await getContactHSID(email)
+    }
+
+    if (!hs_response) {
+      return null
+    }
+
+    let cypher_response = await neode.cypher(
+      "MATCH (t:Tripler {alloy_person_id: $alloy_person_id}) SET t.hs_id=toString($hs_id) RETURN t.id, t.hs_id",
+      {
+        alloy_person_id: tripler.get("alloy_person_id"),
+        hs_id: hs_response,
+      },
+    )
   }
 }
 

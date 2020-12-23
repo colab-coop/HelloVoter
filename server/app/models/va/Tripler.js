@@ -9,9 +9,6 @@ module.exports = {
     type: "uuid",
     primary: true,
   },
-  hs_id: {
-    type: "string",
-  },
   // This attribute contains the VoterID as imported from the voter data CSV
   voter_id: {
     type: "string",
@@ -22,6 +19,7 @@ module.exports = {
   },
   last_name: "string",
   date_of_birth: "string",
+  hs_id: "string",
   phone: {
     type: "string",
   },
@@ -136,10 +134,11 @@ module.exports = {
     default: false,
   },
   own_plans: {
-    type: "relationships",
+    type: "nodes",
     direction: "out",
     relationship: "OWNS",
     target: "VotingPlan",
-    cascade: "delete"
+    cascade: "delete",
+    eager: true,
   }
 }

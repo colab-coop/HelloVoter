@@ -177,6 +177,8 @@ async function approveAmbassador(req, res) {
     return error(500, res, "Error sending approved sms to the ambassador")
   }
 
+  await createAmbassadorVotingPlan(req, found);
+
   return _204(res)
 }
 
@@ -368,7 +370,6 @@ async function signup(req, res) {
   }
 
   if (new_ambassador.get('approved')) {
-    const plan = await createVotingPlan(new_ambassador);
     try {
       await sms(
         new_ambassador.get("phone"),
@@ -385,30 +386,46 @@ async function signup(req, res) {
       req.logger.error("Error sending signup sms to the ambassador")
     }
 
-    // TODO(ping): This message should be sent 24 hours after signup, not immediately.
-    if (ov_config.voting_plan_sms_for_ambassador) {
-      try {
-        await sms(
-          new_ambassador.get("phone"),
-          format(ov_config.voting_plan_sms_for_ambassador, {
-            ambassador_first_name: new_ambassador.get("first_name"),
-            ambassador_last_name: new_ambassador.get("last_name") || "",
-            ambassador_city: JSON.parse(new_ambassador.get("address")).city,
-            organization_name: ov_config.organization_name,
-            ambassador_landing_page: ov_config.ambassador_landing_page,
-            ambassador_voting_plan_link: getVotingPlanUrl(plan)
-          }),
-        )
-      } catch (err) {
-        req.logger.error("Unhandled error in %s: %s", req.url, err)
-        req.logger.error("Error sending voting plan sms to the ambassador")
-      }
-    }
+    await createAmbassadorVotingPlan(req, new_ambassador);
   } else {
     req.logger.warn("Ambassador not approved; not sending intro SMS")
   }
 
   return res.json(serializeAmbassador(new_ambassador))
+}
+
+async function createAmbassadorVotingPlan(req, ambassador) {
+  const plans = await ambassador.get('own_plans');
+  const existingPlan = plans?.first();
+  if (existingPlan) {
+    req.logger.info('Ambassador %s already has a VotingPlan %s',
+      ambassador.get('phone'), existingPlan.get('link_code'));
+    return;
+  }
+
+  const plan = await createVotingPlan(ambassador);
+  req.logger.info('Created new VotingPlan for %s: %s',
+      ambassador.get('phone'), plan.get('link_code'));
+
+  // TODO(ping): This SMS should be sent 24 hours after signup, not immediately.
+  if (ov_config.voting_plan_sms_for_ambassador) {
+    try {
+      await sms(
+        ambassador.get("phone"),
+        format(ov_config.voting_plan_sms_for_ambassador, {
+          ambassador_first_name: ambassador.get("first_name") || "",
+          ambassador_last_name: ambassador.get("last_name") || "",
+          ambassador_city: JSON.parse(ambassador.get("address")).city,
+          organization_name: ov_config.organization_name,
+          ambassador_landing_page: ov_config.ambassador_landing_page,
+          ambassador_voting_plan_link: getVotingPlanUrl(plan)
+        }),
+      )
+    } catch (err) {
+      req.logger.error("Unhandled error in %s: %s", req.url, err)
+      req.logger.error("Error sending voting plan sms to the ambassador")
+    }
+  }
 }
 
 /*

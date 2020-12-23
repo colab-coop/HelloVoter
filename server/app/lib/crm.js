@@ -1,7 +1,7 @@
 const {ov_config} = require("./ov_config")
 const axios = require("axios")
 
-async function getAmbassadorHSID(email) {
+async function getContactHSID(email) {
   let hs_key = ov_config.hubspot_api_key
 
   if (hs_key) {
@@ -134,7 +134,7 @@ async function createHubspotContact(req) {
 }
 
 module.exports = {
-  getAmbassadorHSID: getAmbassadorHSID,
+  getContactHSID: getContactHSID,
   updateHubspotAmbassador: updateHubspotAmbassador,
   createHubspotContact: createHubspotContact,
 }

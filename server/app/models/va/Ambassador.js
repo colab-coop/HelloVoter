@@ -228,11 +228,20 @@ module.exports = {
   // Voting plans (actually links to start them) for Triplers canvassed by
   // this Ambassador.  There should be one of these for each confirmed Tripler.
   canvassed_plans: {
-    type: "relationships",
+    type: "nodes",
     direction: "out",
     relationship: "CANVASSED",
     target: "VotingPlan",
-    cascade: "detach"
+    cascade: "detach",
+    eager: true,
+  },
+  own_plans: {
+    type: "nodes",
+    direction: "out",
+    relationship: "OWNS",
+    target: "VotingPlan",
+    cascade: "delete",
+    eager: true,
   },
   voted: {
     type: "boolean",
