@@ -24,7 +24,7 @@ import { ov_config } from './lib/ov_config';
 import ambassadorSvc from './services/ambassadors';
 import { ip } from './lib/ip';
 import { isLocked } from './lib/fraud';
-import { getVotingPlan } from './services/voting_plans';
+import { getVotingPlan, recordVotingPlanClick } from './services/voting_plans';
 import { prepareBallotReadyUrl } from './services/ballot_ready';
 
 import {
@@ -152,10 +152,12 @@ export function doExpressInit(log, db, qq, neode) {
     getVotingPlan(req.params.code).then(
       (plan) => {
         if (plan) {
+          recordVotingPlanClick(plan);
           const voter = plan.get('voter');
           const canvasser = plan.get('canvasser');
+          const linkCode = plan.get('link_code');
           if (voter || canvasser) {
-            res.redirect(prepareBallotReadyUrl(voter, canvasser));
+            res.redirect(prepareBallotReadyUrl(voter, canvasser, linkCode));
           } else {
             _500(res, 'Voting plan has no voter and no canvasser.');
           }

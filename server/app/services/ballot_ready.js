@@ -13,12 +13,12 @@ const getAddress = (person) => {
   try {
     address = JSON.parse(person.get('address'));
   } catch (e) { }
-  return [
+  return address ? [
     address.address1,
     address.city,
     address.state,
     address.zip
-  ].join(', ');
+  ].join(', ') : null;
 };
 
 const getZip = (person) => {
@@ -27,10 +27,10 @@ const getZip = (person) => {
   try {
     address = JSON.parse(person.get('address'));
   } catch (e) { }
-  return address.zip;
+  return (address ? address.zip : null) || person.get('zip');
 };
 
-const prepareBallotReadyUrl = (voter, canvasser) => {
+const prepareBallotReadyUrl = (voter, canvasser, link_code) => {
   let params;
   params = {
     name: getFullName(voter),
@@ -43,6 +43,9 @@ const prepareBallotReadyUrl = (voter, canvasser) => {
     address: getAddress(voter) || getZip(canvasser),
     utm_content: canvasser?.get?.('hs_id'),
     utm_term: voter?.get?.('hs_id'),
+    // The link_code param is not used by BallotReady; we include it so that
+    // it will show up in the initial_url field in the BallotReady clickstream.
+    link_code: link_code
   };
   return BASE_URL + '?' + stringify(params);
 };

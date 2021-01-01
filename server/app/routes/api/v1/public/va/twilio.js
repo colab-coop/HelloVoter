@@ -60,7 +60,7 @@ module.exports = Router({mergeParams: true})
     }
   }
   catch(err) {
-    req.logger.error(`Error while processing response ${response} from sender ${sender}: ${err}`);
+    req.logger.error(err, `Error while processing response ${response} from sender ${sender}`);
   }
 
   return res.send({});

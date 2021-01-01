@@ -235,6 +235,7 @@ module.exports = {
     cascade: "detach",
     eager: true,
   },
+  // The Ambassador's own voting plans.  Usually there should be at most one.
   own_plans: {
     type: "nodes",
     direction: "out",

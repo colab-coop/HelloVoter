@@ -1,6 +1,9 @@
 const {ov_config} = require("./ov_config")
 const axios = require("axios")
 
+/*
+ * Searches for a Hubspot Contact by email and returns a hubspot contact id. 
+*/
 async function getContactHSID(email) {
   let hs_key = ov_config.hubspot_api_key
 
@@ -24,6 +27,7 @@ async function getContactHSID(email) {
           ],
         },
       )
+      console.log("[HS] hs id:", response.data.results[0].id)
       return response.data.results[0].id
     } catch (err) {
       console.log(`[HS] Lookup failed with error ${err}`)
@@ -37,6 +41,9 @@ async function getContactHSID(email) {
   }
 }
 
+/*
+ * Updates hubspot contact. The response isn't used. 
+*/
 async function updateHubspotAmbassador(req) {
   let hs_key = ov_config.hubspot_api_key
   console.log("req", req)
@@ -63,7 +70,6 @@ async function updateHubspotAmbassador(req) {
             giftcard_completed: req.giftcard_completed ? req.giftcard_completed : null,
             external_id: req.external_id ? req.external_id : null,
             phone: req.phone ? req.phone : null,
-            is_admin: req.is_admin ? req.is_admin : null,
             signup_completed: req.signup_completed ? req.signup_completed : null,
             paypal_approved: req.paypal_approved ? req.paypal_approved : null,
             // TODO: When we have fraud score components, send them to HubSpot
@@ -84,6 +90,9 @@ async function updateHubspotAmbassador(req) {
   }
 }
 
+/*
+ * Creates a new hubspot contact and returns a hubspot contact id. 
+*/
 async function createHubspotContact(req) {
   let hs_key = ov_config.hubspot_api_key
   console.log("req", req)
@@ -110,7 +119,6 @@ async function createHubspotContact(req) {
             giftcard_completed: req.giftcard_completed ? req.giftcard_completed : null,
             google_fb_id: req.external_id ? req.external_id : null,
             phone: req.phone ? req.phone : null,
-            is_admin: req.is_admin ? req.is_admin : null,
             signup_completed: req.signup_completed ? req.signup_completed : null,
             paypal_approved: req.paypal_approved ? req.paypal_approved : null,
             // TODO: When we have fraud score components, send them to HubSpot
@@ -126,7 +134,8 @@ async function createHubspotContact(req) {
     } else {
       console.log('[HS] HUBSPOT_API_KEY is not configured, skipping');
     }
-    return response
+    console.log("[HS] Created new contact with id:", response.data.id)
+    return response.data.id
   } catch (err) {
     console.log(`[HS] Create failed with error ${err}`)
     return null

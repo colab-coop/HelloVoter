@@ -200,14 +200,14 @@ async function initialSyncAmbassadorToHubSpot(ambassador) {
   obj["website"] =
     "https://app.blockpower.vote/ambassadors/admin/#/volunteers/view/" + ambassador.get("id")
   if (!ambassador.get("hs_id")) {
-    console.log("no hs id, gettig it from hs")
-    let hs_response = await getContactHSID(ambassador.get("email"))
-    if (!hs_response) {
-      createHubspotContact(obj)
-      hs_response = await getContactHSID(ambassador.get("email"))
+    console.log("[HS] Checking if Ambassador already has a Hubspot contact.")
+    let hs_id = await getContactHSID(ambassador.get("email"))
+    if (!hs_id) {
+    console.log("[HS] Ambassador is not in Hubspot, creating contact")
+      hs_id = await createHubspotContact(obj)
     }
 
-    if (!hs_response) {
+    if (!hs_id) {
       return null
     }
 
@@ -215,12 +215,12 @@ async function initialSyncAmbassadorToHubSpot(ambassador) {
       "MATCH (a:Ambassador {id: $id}) SET a.hs_id=$hs_id RETURN a.first_name, a.hs_id",
       {
         id: ambassador.get("id"),
-        hs_id: hs_response,
+        hs_id: hs_id,
       },
     )
 
     // send initial data to hubspot, so you know if it's working
-    obj["hs_id"] = hs_response
+    obj["hs_id"] = hs_id
 
     updateHubspotAmbassador(obj)
   }

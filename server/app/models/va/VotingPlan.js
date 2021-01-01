@@ -23,6 +23,7 @@ module.exports = {
   last_send_time: "number",  // last time we texted this link to the voter
 
   link_code: { type: "string", required: true },  // constrained unique
+  link_clicks: "string",  // a JSON array of timestamps when the link was used
 
   canvasser: {
     type: "node",

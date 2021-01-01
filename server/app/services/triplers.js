@@ -2,6 +2,7 @@ import stringFormat from "string-format"
 
 import neo4j from "neo4j-driver"
 import neode from "../lib/neode"
+import {v4 as uuidv4} from "uuid"
 import {serializeName} from "../lib/utils"
 import {normalizeGender, normalizePhone} from "../lib/normalizers"
 import mail from "../lib/mail"
@@ -209,6 +210,32 @@ async function confirmTripler(triplerId) {
   }, 100)
 
   // await ambassadorsSvc.sendTriplerCountsToHubspot(ambassador)
+
+  // Create VotingPlan nodes for the Triplees
+  const plan1 = await createTripleeWithPlan(tripler, triplees[0]);
+  const plan2 = await createTripleeWithPlan(tripler, triplees[1]);
+  const plan3 = await createTripleeWithPlan(tripler, triplees[2]);
+  await tripler.update({
+    triplee1_link_code: plan1.get('link_code'),
+    triplee2_link_code: plan2.get('link_code'),
+    triplee3_link_code: plan3.get('link_code'),
+  });
+}
+
+async function createTripleeWithPlan(tripler, tripleeName) {
+  const triplee = await neode.create('Triplee', {
+    id: uuidv4(),
+    first_name: tripleeName.first_name,
+    last_name: tripleeName.last_name,
+  });
+  await tripler.relateTo(triplee, 'claims');
+  const plan = await createVotingPlan(triplee, tripler);
+  // When we upsert this data into HubSpot, we'll use the email field to
+  // avoid creating duplicates.
+  await triplee.update({
+    email: plan.get('link_code') + '@linkcode.faux.blockpower.vote'
+  });
+  return plan;
 }
 
 /*
@@ -613,31 +640,20 @@ async function setTriplerEkataAssociatedPeople(tripler, verification) {
 
 async function syncTriplerHubSpot(tripler) {
   const email = tripler.get("alloy_person_id") + "@faux.blockpower.vote"
-    if(!tripler.get("hs_id")){
-    await getContactHSID(email)
-  }
+  const query = "MATCH (t:Tripler {alloy_person_id: $alloy_person_id}) SET t.hs_id=toString($hs_id) RETURN t.id, t.hs_id"
 
   if (!tripler.get("hs_id")) {
     let obj = {}
-    console.log("no hs id, gettig it from hs")
-    let hs_response = await getContactHSID(email)
-    if (!hs_response) {
+    console.log("[HS] This tripler has no hs_id, checking if contact already exists.")
+    let hs_id = await getContactHSID(email)
+    if (hs_id) {
+      let cypher_response = await neode.cypher(query,{alloy_person_id: tripler.get("alloy_person_id"),hs_id: hs_id})
+    } else {
+    console.log("[HS] This tripler does not have an existing contact, creating a new one.")
       obj["email"] = email
-      createHubspotContact(obj)
-      hs_response = await getContactHSID(email)
+      let hs_id = await createHubspotContact(obj)
+      let cypher_response = await neode.cypher(query,{alloy_person_id: tripler.get("alloy_person_id"),hs_id: hs_id})
     }
-
-    if (!hs_response) {
-      return null
-    }
-
-    let cypher_response = await neode.cypher(
-      "MATCH (t:Tripler {alloy_person_id: $alloy_person_id}) SET t.hs_id=toString($hs_id) RETURN t.id, t.hs_id",
-      {
-        alloy_person_id: tripler.get("alloy_person_id"),
-        hs_id: hs_response,
-      },
-    )
   }
 }
 

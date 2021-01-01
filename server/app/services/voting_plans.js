@@ -1,6 +1,7 @@
 import {v4 as uuidv4} from "uuid"
 import neode from '../lib/neode';
 import {ov_config} from "../lib/ov_config"
+import {parseJson} from '../lib/json';
 import { selectTemplate, fillTemplate, getTemplateUsageCount } from '../lib/link_code';
 
 const createVotingPlan = async (voter, canvasser) => {
@@ -43,8 +44,20 @@ const getVotingPlan = async (linkCode) =>
 const getVotingPlanUrl = (plan) =>
   ov_config.short_link_base_url + '/' + plan.get('link_code');
 
+const recordVotingPlanClick = async (plan) => {
+  const clicks = plan.get('link_clicks');
+  const createTime = +plan.get('create_time');
+  const timestamps = parseJson(clicks, []) || [];
+  timestamps.push((new Date()).toISOString());
+  await plan.update({
+    link_clicks: JSON.stringify(timestamps),
+    create_time: createTime
+  });
+};
+
 module.exports = {
   createVotingPlan,
   getVotingPlan,
-  getVotingPlanUrl
+  getVotingPlanUrl,
+  recordVotingPlanClick
 };

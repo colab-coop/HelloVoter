@@ -79,6 +79,20 @@ module.exports = {
     eager: true,
     cascade: "detach",
   },
+  // This relationship points to this Tripler's Triplees.
+  claims: {
+    type: "relationships",
+    relationship: "CLAIMS",
+    direction: "out",
+    target: "Triplee",
+    properties: {
+      since: {
+        type: "localdatetime",
+        default: () => new Date(),
+      },
+    },
+    eager: true,
+  },
   // Points to the EkataLocation(s) in which the Tripler is presumably located.
   ekata_located: {
     type: "relationships",
@@ -133,6 +147,17 @@ module.exports = {
     type: "boolean",
     default: false,
   },
+  // Voting plans (actually links to start them) for Triplees canvassed by
+  // this Tripler.  There should be three of these for each confirmed Tripler.
+  canvassed_plans: {
+    type: "nodes",
+    direction: "out",
+    relationship: "CANVASSED",
+    target: "VotingPlan",
+    cascade: "detach",
+    eager: true,
+  },
+  // The Tripler's own voting plans.  Usually there should be at most one.
   own_plans: {
     type: "nodes",
     direction: "out",
