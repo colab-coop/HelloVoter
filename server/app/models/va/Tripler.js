@@ -141,6 +141,7 @@ module.exports = {
   //   for example, 'GA Atlanta' would indicate this Tripler lives in the Atlanta metro region
   msa: "string",
   zip: "string",
+  address1_with_house_number:"string",
   // The birth month (1-12) of this Tripler, according to the Ambassador.
   claimed_birth_month: "number",
   voted: {

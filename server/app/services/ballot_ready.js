@@ -13,8 +13,9 @@ const getAddress = (person) => {
   try {
     address = JSON.parse(person.get('address'));
   } catch (e) { }
+  let address1 = person.get('address1_with_house_number') ||  address.address1;
   return address ? [
-    address.address1,
+    address1,
     address.city,
     address.state,
     address.zip

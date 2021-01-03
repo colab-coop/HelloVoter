@@ -96,10 +96,15 @@ async function signup(json, verification, carrierLookup) {
   if (alloy_response) {
     const alloy_person_id = '' + alloy_response?.data?.alloy_person_id
     existing_ambassador = await neode.first("Ambassador", {alloy_person_id: alloy_person_id})
-    console.log("my ambassador:",existing_ambassador)
-    console.log("testing:",alloy_person_id)
+    console.log("[SignUp] Pre-loaded Ambassador Exists:",existing_ambassador)
   }
-  //if there's a fuzzy match, approve the Ambassador
+
+  //this will be the fallback if fuzzy returns nothing
+  const preapproved = existing_ambassador ? existing_ambassador.get("approved") : false
+  console.log("[SignUp] New ambassador's pre-approval status:",preapproved)
+
+  //if there's a fuzzy match, approve the Ambassador no matter what. 
+  //If no fuzzy, will fall back to pre-approval.
   let fuzzy = await fuzzyAlloy(
     json.first_name,
     json.last_name,
@@ -117,7 +122,7 @@ async function signup(json, verification, carrierLookup) {
     address: JSON.stringify(address, null, 2),
     quiz_results: JSON.stringify(json.quiz_results, null, 2) || null,
     signup_completed: true,
-    approved: fuzzy > 0 ? true : false,
+    approved: fuzzy > 0 ? true : preapproved,
     location: {
       latitude: parseFloat(coordinates.latitude),
       longitude: parseFloat(coordinates.longitude),
@@ -130,11 +135,10 @@ async function signup(json, verification, carrierLookup) {
 
   if (existing_ambassador && !existing_ambassador.get("external_id")) {
     // existing ambassador exists and does not have an external id
-    // delete it and copy over the approved and alloy_person_id
+    // re-label the existing ambassador to avoid alloy_person_id constraint violation
+    // and copy over alloy_person_id to the new ambassador
+    // copy all the relationships from old to new
     const alloy_person_id = existing_ambassador.get("alloy_person_id")
-    let approved = existing_ambassador.get("approved")
-    //copy all the relationships from one to the other
-    //turn the placeholder ambassador into "DummyAmbassador"
     let query = `MATCH (old:Ambassador {alloy_person_id: toString($alloy_person_id)})
               MATCH (new:Ambassador {id: $new_ambassador})
               OPTIONAL MATCH (old)-[out:HAS_SOCIAL_MATCH]->(s1:SocialMatch)
@@ -147,7 +151,6 @@ async function signup(json, verification, carrierLookup) {
               SET old:DummyAmbassador
               REMOVE old:Ambassador
               SET new.alloy_person_id=old.alloy_person_id
-              SET new.approved=old.approved
               RETURN new, old
               `
     let status = await neode.cypher(query, {
