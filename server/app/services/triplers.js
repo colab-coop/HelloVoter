@@ -5,6 +5,7 @@ import neode from "../lib/neode"
 import {v4 as uuidv4} from "uuid"
 import {serializeName} from "../lib/utils"
 import {normalizeGender, normalizePhone} from "../lib/normalizers"
+import {parseJson} from "../lib/json"
 import mail from "../lib/mail"
 import {ov_config} from "../lib/ov_config"
 import sms from "../lib/sms"
@@ -135,10 +136,10 @@ async function confirmTripler(triplerId) {
   }
 
   const plan = await createVotingPlan(tripler, ambassador);
+  const triplees = parseJson(tripler.get("triplees"), []);
 
   if (ov_config.voting_plan_sms_for_tripler) {
     try {
-      const triplees = JSON.parse(tripler.get("triplees"))
       await sms(
         tripler.get("phone"),
         stringFormat(ov_config.voting_plan_sms_for_tripler, {
@@ -153,7 +154,8 @@ async function confirmTripler(triplerId) {
           triplee_3: serializeTriplee(triplees[2]),
           tripler_voting_plan_link: getVotingPlanUrl(plan)
         })
-      )
+      );
+      plan.update({"last_send_time": new Date().getTime()});
     } catch (err) {
       req.logger.error("Unhandled error in %s: %s", req.url, err)
       return error(500, res, "Error sending voting plan SMS to the tripler")
@@ -161,7 +163,6 @@ async function confirmTripler(triplerId) {
   }
 
   // send ambassador an sms
-  let triplees = JSON.parse(tripler.get("triplees"))
   try {
     await sms(
       ambassador.get("phone"),
@@ -211,7 +212,11 @@ async function confirmTripler(triplerId) {
 
   // await ambassadorsSvc.sendTriplerCountsToHubspot(ambassador)
 
-  // Create VotingPlan nodes for the Triplees
+  await createTripleeNodes(tripler);
+};
+
+async function createTripleeNodes(tripler) {
+  const triplees = parseJson(tripler.get("triplees"), []);
   const plan1 = await createTripleeWithPlan(tripler, triplees[0]);
   const plan2 = await createTripleeWithPlan(tripler, triplees[1]);
   const plan3 = await createTripleeWithPlan(tripler, triplees[2]);
@@ -229,7 +234,7 @@ async function createTripleeWithPlan(tripler, tripleeName) {
     last_name: tripleeName.last_name,
   });
   await tripler.relateTo(triplee, 'claims');
-  const plan = await createVotingPlan(triplee, tripler);
+  const plan = await createVotingPlan(triplee, tripler, true);
   // When we upsert this data into HubSpot, we'll use the email field to
   // avoid creating duplicates.
   await triplee.update({
@@ -640,6 +645,7 @@ async function setTriplerEkataAssociatedPeople(tripler, verification) {
 
 async function syncTriplerHubSpot(tripler) {
   const email = tripler.get("alloy_person_id") + "@faux.blockpower.vote"
+  tripler.update({email: email});
   const query = "MATCH (t:Tripler {alloy_person_id: $alloy_person_id}) SET t.hs_id=toString($hs_id) RETURN t.id, t.hs_id"
 
   if (!tripler.get("hs_id")) {
@@ -670,4 +676,5 @@ module.exports = {
   updateTriplerCarrier: updateTriplerCarrier,
   updateTriplerBlockedCarrier: updateTriplerBlockedCarrier,
   updateClaimedBirthMonth: updateClaimedBirthMonth,
+  createTripleeNodes: createTripleeNodes,
 }

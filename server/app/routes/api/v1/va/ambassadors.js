@@ -420,7 +420,8 @@ async function createAmbassadorVotingPlan(req, ambassador) {
           ambassador_landing_page: ov_config.ambassador_landing_page,
           ambassador_voting_plan_link: getVotingPlanUrl(plan)
         }),
-      )
+      );
+      plan.update({"last_send_time": new Date().getTime()});
     } catch (err) {
       req.logger.error("Unhandled error in %s: %s", req.url, err)
       req.logger.error("Error sending voting plan sms to the ambassador")

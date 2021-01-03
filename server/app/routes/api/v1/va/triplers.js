@@ -26,6 +26,7 @@ import {
 } from "./serializers"
 
 import sms from "../../../../lib/sms"
+import neode from "../../../../lib/neode"
 import {getUserJsonFromRequest} from "../../../../lib/normalizers"
 
 /*
@@ -416,4 +417,28 @@ module.exports = Router({mergeParams: true})
   .get("/triplers-limit", (req, res) => {
     if (!req.authenticated) return _401(res, "Permission denied.")
     return getTriplerLimit(req, res)
+  })
+  .post('/triplers/create_triplees', async (req, res) => {
+    if (!req.authenticated) return _401(res, "Permission denied.")
+    if (!req.admin) return _403(res, "Permission denied.")
+    const results = await neode.cypher(
+      'MATCH (t:Tripler {status: "confirmed"}) WHERE EXISTS(t.triplees) AND NOT (t)-[:CLAIMS]->() RETURN t.id as id LIMIT $limit',
+      {limit: +req.body.count || 0}
+    );
+    const processed = [];
+    for (let i = 0; i < results.records.length; i++) {
+      const id = results.records[i].get('id');
+      const tripler = await neode.first('Tripler', 'id', id);
+      req.logger.warn(['id', id, 'tripler', tripler]);
+      if (tripler) {
+        await triplersSvc.createTripleeNodes(tripler);
+        let email = tripler.get('email');
+        if (!email) {
+          email = tripler.get("alloy_person_id") + "@faux.blockpower.vote";
+          tripler.update({email: email});
+        }
+        processed.push(email);
+      }
+    }
+    return res.json(processed);
   })

@@ -42,7 +42,7 @@ module.exports = {
     direction: "out",
     relationship: "OWNS",
     target: "VotingPlan",
-    cascade: "delete",
+    cascade: "detach",
     eager: true,
   }
 }

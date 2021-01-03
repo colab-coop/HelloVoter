@@ -88,33 +88,35 @@ module.exports = Router({mergeParams: true})
 })
 .get('/dashboard', async (req, res) => {
   let nv = await req.db.version();
-  if (req.user.admin === true) return res.json({
-    admins: (await req.db.query('match (v:Ambassador {admin:true}) return count(v)')).data[0],
-    volunteers: (await req.db.query('match (a:Ambassador) return count(a)')).data[0],
-    turfs: (await req.db.query('match (a:Turf) return count(a)')).data[0],
-    attributes: (await req.db.query('match (at:Attribute) return count(at)')).data[0],
-    forms: (await req.db.query('match (a:Form) return count(a)')).data[0],
-    addresses: (await req.db.query('match (a:Address) return count(a)')).data[0],
+  return res.json({
+    admins: (await req.db.query('match (v:Ambassador {admin: true}) return count(v)')).data[0],
+    ambassadors: (await req.db.query('match (a:Ambassador) return count(a)')).data[0],
+    approved: (await req.db.query('match (a:Ambassador {approved: true}) return count(a)')).data[0],
+    signup_completed: (await req.db.query('match (a:Ambassador {signup_completed: true}) return count(a)')).data[0],
+    quiz_completed: (await req.db.query('match (a:Ambassador {quiz_completed: true}) return count(a)')).data[0],
+    onboarding_completed: (await req.db.query('match (a:Ambassador {onboarding_completed: true}) return count(a)')).data[0],
+    triplers: (await req.db.query('match (a:Tripler) return count(a)')).data[0],
+    triplees: (await req.db.query('match (a:Triplee) return count(a)')).data[0],
+    voting_plans: (await req.db.query('match (a:VotingPlan) return count(a)')).data[0],
     dbsize: await req.db.size(),
     version: version,
     neo4j_version: nv,
   });
-  else {
-    let ass = await volunteerAssignments(req, 'Ambassador', req.user);
-    return res.json({
-      admins: (await req.db.query('match (v:Ambassador {admin:true}) return count(v)')).data[0],
-      volunteers: (await req.db.query('match (v:Ambassador {id:{id}}) return v', req.user)).data.length,
-      turfs: ass.turfs.length,
-      attributes: 'N/A',
-      forms: ass.forms.length,
-      addresses: 'N/A',
-      version: (ass.ready?version:null),
-      neo4j_version: (ass.ready?nv:null),
-    });
-  }
 })
 .get('/google_maps_key', async (req, res) => {
   let ass = await volunteerAssignments(req, 'Ambassador', req.user);
   if (ass.ready || req.user.admin) return res.json({google_maps_key: ov_config.google_maps_key });
   else return _401(res, "No soup for you");
-});
+})
+.post('/create_triplee_nodes', async (req, res) => {
+  if (!req.user.admin) return _403(res, "Permission denied.");
+
+  const triplers = await neode.cypher(
+    'MATCH (t:Tripler) WHERE NOT (t)-[:CLAIMS]->() RETURN t LIMIT $limit',
+    {limit: +req.body.count || 0}
+  );
+  for (let i = 0; i < triplers.records.length; i++) {
+    const tripler = triplers.records[i];
+    await createTripleeNodes(tripler);
+  }
+})

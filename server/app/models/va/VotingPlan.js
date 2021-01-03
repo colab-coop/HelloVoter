@@ -4,8 +4,8 @@
 // of a voting plan; related to the voter who is making the plan and the
 // canvasser who provided the link.
 //
-// The voter can be an Ambassador, a Tripler, or (when we have Triplee nodes)
-// a Triplee; Ambassadors have no canvasser.  The three patterns look like this:
+// The voter can be an Ambassador, a Tripler, or a Triplee; Ambassadors have
+// no canvasser.  The three possible patterns look like this:
 //
 //                                 (v: VotingPlan) <-[:OWNS]- (a: Ambassador)
 // (a: Ambassador) -[:CANVASSED]-> (v: VotingPlan) <-[:OWNS]- (b: Tripler)
@@ -19,7 +19,7 @@ module.exports = {
   // so it can also serve as a unique ID for a voting plan created by a voter.
   ballot_id: "string",  // constrained unique
 
-  create_time: { type: "number", required: true },
+  create_time: "number",  // when this VotingPlan was created
   last_send_time: "number",  // last time we texted this link to the voter
 
   link_code: { type: "string", required: true },  // constrained unique

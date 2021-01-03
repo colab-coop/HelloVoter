@@ -14,7 +14,7 @@ const randomDigits = (count) => {
 
 const lowercaseLettersOnly = (name) => name.toLowerCase().replace(/[^a-z]/g, '');
 
-const selectTemplate = async (firstName, lastName) => {
+const selectTemplate = async (firstName, lastName, lowPrivacyMode) => {
   const first = lowercaseLettersOnly(firstName);
   const last = lowercaseLettersOnly(lastName);
 
@@ -39,6 +39,13 @@ const selectTemplate = async (firstName, lastName) => {
   if (lastInitial != 'o' && lastInitial != 'l') options.push(
     {maxLength: 16, template: first + '_' + lastInitial + '_'}
   );
+
+  // Low-privacy link code templates only have digits at the end.
+  if (lowPrivacyMode) {
+    for (const option of options) {
+      option.template = option.template.replace(/_/g, '') + '_';
+    }
+  }
 
   let lowestCost = Infinity;
   let bestTemplate = null;
