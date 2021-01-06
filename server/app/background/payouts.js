@@ -51,7 +51,7 @@ async function disburse_task(ambassador, tripler) {
 async function disburse() {
   console.log('Disbursing amount to ambassadors...');
 
-  let query = `MATCH (:Account)<-[:OWNS_ACCOUNT]-(a:Ambassador {approved: true})-[gp:GETS_PAID]->(:Payout {status: 'pending'}) RETURN a.id, gp.tripler_id LIMIT ${ov_config.payout_batch_size}`;
+  let query = `MATCH (:Account)<-[:OWNS_ACCOUNT]-(a:Ambassador {approved: true})-[gp:GETS_PAID]->(:Payout {status: 'pending'}),(a)-[:CLAIMS]->(:Tripler {id:gp.tripler_id, status:"confirmed"}) RETURN a.id, gp.tripler_id LIMIT ${ov_config.payout_batch_size}`;
 
   let res = await neode.cypher(query);
 
@@ -63,10 +63,8 @@ async function disburse() {
       let tripler_id = record._fields[1];
       let ambassador = await ambassadorSvc.findById(ambassador_id);
       let tripler = await triplerSvc.findById(tripler_id);
-      //We don't want to pay out locked ambassadors or triplers who are not claimed
-      const locked = isLocked(ambassador)
-      const triplerStatus = tripler.get("status")
-      if (ambassador && tripler && !isLocked(ambassador) && triplerStatus == "confirmed") {
+      //We don't want to pay out locked ambassadors
+      if (ambassador && tripler && !isLocked(ambassador)) {
         fifo.add(await disburse_task(ambassador, tripler));
       }
     }
