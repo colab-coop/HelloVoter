@@ -5,6 +5,7 @@ import paypalSvc from '../services/paypal';
 import fifo from '../lib/fifo';
 import { ov_config } from '../lib/ov_config';
 import neode from '../lib/neode';
+import {isLocked} from '../lib/fraud';
 
 /*
  *
@@ -62,7 +63,10 @@ async function disburse() {
       let tripler_id = record._fields[1];
       let ambassador = await ambassadorSvc.findById(ambassador_id);
       let tripler = await triplerSvc.findById(tripler_id);
-      if (ambassador && tripler) {
+      //We don't want to pay out locked ambassadors or triplers who are not claimed
+      const locked = isLocked(ambassador)
+      const triplerStatus = tripler.get("status")
+      if (ambassador && tripler && !isLocked(ambassador) && triplerStatus == "confirmed") {
         fifo.add(await disburse_task(ambassador, tripler));
       }
     }
